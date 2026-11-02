@@ -31,5 +31,27 @@
     "quote": "测试引用",
     "timestamp": 1793606975,
     "date": "2026-11-02 16:09:35"
+  },
+  {
+    "issue_id": "ISSUE_15BD2BCB",
+    "rule_id": "RULE_ENTITY_MISMATCH",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "富国天惠精选成长混合型证券投资基金_2023年年度报告.pdf",
+    "quote": "2. 招商银行股份有限公司托管协议与报告备查文件。",
+    "timestamp": 1793613517,
+    "date": "2026-11-02 17:58:37"
+  },
+  {
+    "issue_id": "ISSUE_15BD2BCB",
+    "rule_id": "RULE_ENTITY_MISMATCH",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "富国天惠精选成长混合型证券投资基金_2023年年度报告.pdf",
+    "quote": "2. 招商银行股份有限公司托管协议与报告备查文件。",
+    "timestamp": 1793613521,
+    "date": "2026-11-02 17:58:41"
   }
 ]

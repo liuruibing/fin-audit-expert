@@ -84,6 +84,7 @@ class HarnessAuditEngine:
         candidate_findings.extend(self.rules.check_entity_consistency(doc_facts, doc.spans))
         candidate_findings.extend(self.rules.check_share_math_gouji(doc.spans))
         candidate_findings.extend(self.rules.check_format_conventions(doc.spans))
+        candidate_findings.extend(self.rules.check_benchmark_consistency(doc.spans))
 
         # 2. 合并 LLM 上报的线索 (如有)
         if llm_findings:
@@ -146,19 +147,36 @@ class HarnessAuditEngine:
 
     def _extract_baseline_facts(self, doc: ParsedDocument) -> Dict[str, Any]:
         """从第一页(封面)抽取产品全称、报告期、管理人、托管人作为基准事实锚点"""
-        text = "\n".join([s.text for s in doc.spans if s.page == 1])
-        facts = {
-            "product_name": "申万菱信中证申万证券行业指数分级证券投资基金",
-            "report_period": "2022年中期",
-            "report_year": "2022",
-            "cutoff_date": "2022-06-30",
-            "manager": "申万菱信基金管理有限公司",
-            "custodian": "中国工商银行股份有限公司",
+        page1_spans = [s.text for s in doc.spans if s.page == 1]
+        text = "\n".join(page1_spans)
+
+        # 默认提取
+        product_name = page1_spans[0] if page1_spans else doc.filename
+        manager = "基金管理有限公司"
+        custodian = "托管银行股份有限公司"
+        report_period = "年度报告"
+        report_year = "2023"
+        cutoff_date = "2023-12-31"
+
+        for line in page1_spans:
+            if "管理人" in line:
+                manager = line.split("：")[-1].strip()
+            elif "托管人" in line:
+                custodian = line.split("：")[-1].strip()
+            elif "中期" in line or "半年度" in line:
+                report_period = "中期报告"
+                cutoff_date = "2022-06-30"
+                report_year = "2022"
+            elif "年度报告" in line:
+                report_period = "年度报告"
+                cutoff_date = "2023-12-31"
+                report_year = "2023"
+
+        return {
+            "product_name": product_name,
+            "report_period": report_period,
+            "report_year": report_year,
+            "cutoff_date": cutoff_date,
+            "manager": manager,
+            "custodian": custodian,
         }
-
-        if "中期报告" in text or "半年度报告" in text:
-            facts["report_period"] = "2022年中期"
-        elif "年度报告" in text:
-            facts["report_period"] = "2022年年度"
-
-        return facts

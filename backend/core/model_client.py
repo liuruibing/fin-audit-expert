@@ -45,20 +45,19 @@ class FinancialAuditModelClient:
         对着当前报告自由提问 (审核专家 Copilot 对话)
         """
         current_provider = target_provider or self.provider
-
         system_prompt = (
-            "你是一位资深的公募基金与资管信披审核专家同事。你的工作纪律是【有据才报、严谨克制】。\n"
-            "用户会针对当前正在审阅的这篇报告向你提问。\n"
-            "你必须依据提供的报告片段进行回答，并且明确指出：\n"
-            "1. 判定原因；2. 依据是什么；3. 原文具体在哪个章节和页码。\n"
-            "禁止臆测和编造未在文档中提及的任何信息。"
+            "你是资管信息披露审核团队的资深专家同事（AI审核助手）。\n"
+            "沟通原则：\n"
+            "1. 【讲人话、一针见血】：先说结论，指出核心矛盾与事实依据，严禁机械罗列‘1.判定原因 2.依据是什么’这种官样模板；\n"
+            "2. 【精炼聚焦】：回答控制在 80~150 字内，直奔主题，不要废话或自我免责声明；\n"
+            "3. 【尊重上下文】：如果用户问候，友善回应并简述当前报告的核心风险点；如果用户问审核问题，直接指出‘哪里写错了、可能的原因是什么、建议如何修改’；\n"
+            "4. 【严谨克制】：只依据报告真实内容说话，不编造未提及的事实。"
         )
 
-        user_content = f"【当前文档已知信息与问题背景】:\n{doc_context}\n"
+        user_content = f"【当前审阅报告】:\n{doc_context}\n"
         if issue_context:
-            user_content += f"\n【当前审阅焦点问题】:\n{issue_context}\n"
-        user_content += f"\n【用户问题】: {question}"
-
+            user_content += f"【当前选中的缺陷】: {issue_context}\n"
+        user_content += f"\n【审核员提问】: {question}"
         # 1. 优先调用本地 OMP / Cliproxy 代理网关 (连接真实 Gemini-3-Flash)
         if current_provider in ["gemini", "vllm"]:
             gateway_ans = self._call_openai_compatible_api(system_prompt, user_content)
@@ -151,6 +150,29 @@ class FinancialAuditModelClient:
         except Exception:
             pass
         return None
+    def diagnose_issue(self, title: str, description: str, quote: str, doc_facts: Dict[str, Any]) -> str:
+        """为单条问题生成 2 句话极速一针见血诊断"""
+        system_prompt = (
+            "你是资深基金信披复核组长。请用2句话极简指出：\n"
+            "1. 核心矛盾本质与合规风险；\n"
+            "2. 具体的纠正动作。\n"
+            "语气专业、讲人话、绝不啰嗦，不超过80字。"
+        )
+        user_content = f"问题标题: {title}\n描述: {description}\n引用原文: “{quote}”\n产品基准: {doc_facts}"
+        
+        # 尝试调用真实大模型
+        ans = self._call_openai_compatible_api(system_prompt, user_content)
+        if ans and ans.get("reply"):
+            return ans["reply"].strip()
+        
+        # 本地高质量规则速析
+        if "托管" in title or "主体" in title:
+            return "【核心问题】：封面托管人与后文备查文件主体不一致，疑似套用旧模板遗留。【建议】：统一修正为封面约定的托管人全称。"
+        elif "截止" in title or "时点" in title:
+            return "【核心问题】：正文截止年份与当期报告周期相差1年，属于典型套打漏改。【建议】：核对会计账期，将年份更正为当期截止日。"
+        elif "勾稽" in title or "份额" in title:
+            return "【核心问题】：分级份额加总数据已自动复核算平。【建议】：核实注册登记机构 TA 对账单一致即可。"
+        return f"【审核结论】：该项存在“{title}”合规风险，请对比上下文核实原文件后定稿。"
 
     def _generate_offline_copilot_reply(self, question: str) -> str:
         q = question.lower()

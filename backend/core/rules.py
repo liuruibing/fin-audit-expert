@@ -122,6 +122,36 @@ class SymbolicAuditRules:
                         ))
 
         return findings
+    @staticmethod
+    def check_benchmark_consistency(spans: List[Any]) -> List[RuleFinding]:
+        """检查同一份报告内业绩比较基准定义是否产生冲突"""
+        findings = []
+        base_bm = None
+        base_page = None
+
+        bm_pattern = re.compile(r"业绩比较基准[：:\s]*(.*)")
+        for span in spans:
+            match = bm_pattern.search(span.text)
+            if match:
+                bm_text = match.group(1).strip()
+                if not base_bm:
+                    base_bm = bm_text
+                    base_page = span.page
+                else:
+                    if bm_text != base_bm and ("中证" in bm_text or "沪深" in bm_text):
+                        findings.append(RuleFinding(
+                            rule_id="RULE_BENCHMARK_MISMATCH",
+                            title="业绩比较基准描述前后矛盾",
+                            category="SUBSTANTIAL",
+                            severity="HIGH",
+                            description=f"§2节基准为【{base_bm}】，但在第{span.page}页表述为【{bm_text}】，涉及核心评价指标前后不一。",
+                            quote=span.text,
+                            page=span.page,
+                            context_quote=f"业绩比较基准：{base_bm}",
+                            context_page=base_page,
+                            confidence=0.96,
+                        ))
+        return findings
 
     @staticmethod
     def check_share_math_gouji(spans: List[Any]) -> List[RuleFinding]:

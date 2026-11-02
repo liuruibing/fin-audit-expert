@@ -14,6 +14,7 @@ createApp({
       filterCategory: 'ALL', // 'ALL' | 'SUBSTANTIAL' | 'DOUBT' | 'FORMAT'
       selectedIssue: null,
       selectedSample: 'swlx',
+      zoomScale: '1.0',
 
       // 模型底座引擎
       supportedModels: [
@@ -279,6 +280,45 @@ createApp({
       } catch (e) {
         alert('上传审核失败: ' + e);
       }
-    }
+    },
+    changePage(delta) {
+      const target = this.currentPage + delta;
+      if (target >= 1 && target <= this.docPages.length) {
+        this.currentPage = target;
+        this.$nextTick(() => {
+          if (this.$refs.docViewport) {
+            this.$refs.docViewport.scrollTop = 0;
+          }
+        });
+      }
+    },
+
+    async runInlineDiagnosis(issue) {
+      if (issue.diagnosis) {
+        // 再次点击折叠
+        issue.diagnosis = null;
+        return;
+      }
+      issue.diagnosis = '专家正在秒级研判中...';
+      try {
+        const res = await fetch('/api/audit/diagnose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: issue.title,
+            description: issue.description,
+            quote: issue.quote
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          issue.diagnosis = data.analysis;
+        } else {
+          issue.diagnosis = '诊断超时，请重试。';
+        }
+      } catch (e) {
+        issue.diagnosis = '分析失败，请检查网络。';
+      }
+    },
   }
 }).mount('#app');

@@ -44,6 +44,10 @@ class DecisionRequest(BaseModel):
     document_name: Optional[str] = ""
     quote: Optional[str] = ""
 
+class DiagnoseRequest(BaseModel):
+    title: str
+    description: str
+    quote: str
 
 class CopilotAskRequest(BaseModel):
     question: str
@@ -128,6 +132,13 @@ def get_current_audit():
             for p in range(1, active_parsed_doc.total_pages + 1)
         ],
     }
+@app.post("/api/audit/diagnose")
+def diagnose_single_issue(req: DiagnoseRequest):
+    """卡片就地极速 AI 诊断"""
+    global active_audit_result
+    doc_facts = active_audit_result.get("doc_facts", {})
+    analysis = model_client.diagnose_issue(req.title, req.description, req.quote, doc_facts)
+    return {"analysis": analysis}
 @app.post("/api/audit/upload")
 async def upload_and_audit(file: UploadFile = File(...)):
     """上传真实 PDF 研报并执行 Harness 全自动审核流水线"""

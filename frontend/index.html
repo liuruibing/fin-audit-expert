@@ -136,23 +136,23 @@
       <!-- 双栏核心交互区 -->
       <div class="flex-1 flex overflow-hidden">
         
-        <!-- 左栏: 分级问题清单与专家裁决 (450px) -->
-        <div class="w-[480px] border-r border-slate-800 flex flex-col bg-slate-950/70 overflow-hidden shrink-0">
+        <!-- 左栏: 分级问题清单与专家裁决 (420px) -->
+        <div class="w-[420px] border-r border-slate-800 flex flex-col bg-slate-950/70 overflow-hidden shrink-0">
           <div class="p-3 bg-slate-900/80 border-b border-slate-800/60 text-xs text-slate-400 flex justify-between items-center">
             <span>发现清单（点击卡片，原版面自动滚动高亮）</span>
-            <span class="text-emerald-400">Harness 证据链对齐率 100%</span>
+            <span class="text-emerald-400 font-medium">Harness 证据链 100% 对齐</span>
           </div>
 
           <!-- 卡片列表滚动容器 -->
-          <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
             <div 
               v-for="issue in filteredIssues" 
               :key="issue.id"
               @click="focusIssue(issue)"
               :class="[
-                'p-4 rounded-xl border transition-all cursor-pointer relative',
+                'p-3.5 rounded-xl border transition-all cursor-pointer relative',
                 selectedIssue && selectedIssue.id === issue.id 
-                  ? 'border-emerald-500/60 bg-slate-800/90 ring-1 ring-emerald-500/30 shadow-lg' 
+                  ? 'border-emerald-500/70 bg-slate-800/90 ring-1 ring-emerald-500/30 shadow-lg' 
                   : 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900/80'
               ]">
               
@@ -164,51 +164,61 @@
                     class="text-[10px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">
                     {{ issue.severity === 'HIGH' ? '高风险' : (issue.severity === 'MEDIUM' ? '中' : '建议') }}
                   </span>
-                  <span class="font-semibold text-sm text-slate-100">{{ issue.title }}</span>
+                  <span class="font-semibold text-xs text-slate-100 tracking-tight">{{ issue.title }}</span>
                 </div>
                 <span class="text-[11px] text-slate-400 font-mono">第 {{ issue.page }} 页</span>
               </div>
 
               <!-- 描述内容 -->
-              <p class="text-xs text-slate-300 leading-relaxed mb-3">
+              <p class="text-xs text-slate-300 leading-relaxed mb-2.5">
                 {{ issue.description }}
               </p>
 
               <!-- 证据摘录引用框 -->
-              <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs mb-3 font-mono">
-                <div class="text-[10px] text-slate-500 mb-1 flex items-center space-x-1">
-                  <span>原文逐字出处:</span>
-                </div>
-                <div class="text-amber-200/90 text-xs">
+              <div class="p-2 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs mb-2.5 font-mono">
+                <div class="text-[10px] text-slate-500 mb-0.5">原文出处:</div>
+                <div class="text-amber-200/90 text-xs leading-normal">
                   “{{ issue.quote }}”
                 </div>
               </div>
 
+              <!-- AI 就地极速诊断展开块 -->
+              <div v-if="issue.diagnosis" class="mb-2.5 p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 leading-relaxed animate-fadeIn">
+                <div class="text-[10px] font-bold text-emerald-400 mb-1 flex items-center space-x-1">
+                  <span>⚡ 审核专家速析:</span>
+                </div>
+                <div>{{ issue.diagnosis }}</div>
+              </div>
+
               <!-- 专家裁决操作栏 -->
               <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs" @click.stop>
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-1.5">
                   <button 
                     @click="makeDecision(issue, 'CONFIRMED_DEFECT')"
                     :class="issue.status === 'CONFIRMED_DEFECT' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-800 text-slate-300 hover:bg-emerald-700/60'"
-                    class="px-2.5 py-1 rounded transition-colors text-[11px]">
-                    {{ issue.status === 'CONFIRMED_DEFECT' ? '✓ 已裁决: 真缺陷' : '真缺陷' }}
+                    class="px-2 py-1 rounded transition-colors text-[11px]">
+                    {{ issue.status === 'CONFIRMED_DEFECT' ? '✓ 真缺陷' : '真缺陷' }}
                   </button>
                   <button 
                     @click="makeDecision(issue, 'FALSE_ALARM')"
                     :class="issue.status === 'FALSE_ALARM' ? 'bg-rose-700 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:bg-rose-900/50'"
                     class="px-2 py-1 rounded transition-colors text-[11px]">
-                    {{ issue.status === 'FALSE_ALARM' ? '✕ 误报(回流)' : '误报' }}
+                    {{ issue.status === 'FALSE_ALARM' ? '✕ 误报' : '误报' }}
                   </button>
                 </div>
 
-                <button 
-                  @click="openCopilotForIssue(issue)"
-                  class="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 text-[11px]">
-                  <span>问专家</span>
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                  </svg>
-                </button>
+                <div class="flex items-center space-x-2">
+                  <button 
+                    @click="runInlineDiagnosis(issue)"
+                    class="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/20 transition-all flex items-center space-x-1">
+                    <span>⚡ AI诊断</span>
+                  </button>
+                  <button 
+                    @click="openCopilotForIssue(issue)"
+                    class="text-slate-400 hover:text-emerald-300 text-[11px]">
+                    追问 ↗
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -218,33 +228,55 @@
         <!-- 右栏: 报告原版面渲染与逐字高亮覆盖 -->
         <div class="flex-1 flex flex-col bg-slate-900 overflow-hidden relative">
           
-          <!-- 视口顶部工具条 -->
-          <div class="h-10 bg-slate-950/60 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-400">
-            <div class="flex items-center space-x-4">
-              <span>版面渲染视图 (PDF 原文逐字高亮)</span>
-              <div class="flex items-center space-x-1">
+          <!-- 视口顶部工具条 (专业 PDF 阅读器风格) -->
+          <div class="h-11 bg-slate-950/80 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-300 shrink-0">
+            <div class="flex items-center space-x-3">
+              <!-- 翻页控制 -->
+              <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
                 <button 
-                  v-for="p in docPages.length" 
-                  :key="p"
-                  @click="currentPage = p"
-                  :class="currentPage === p ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'"
-                  class="w-6 h-6 rounded flex items-center justify-center font-mono">
-                  {{ p }}
+                  @click="changePage(-1)" 
+                  :disabled="currentPage <= 1"
+                  class="px-2 py-1 rounded text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition-colors">
+                  上一页
                 </button>
+                <span class="px-2 font-mono text-emerald-400 font-semibold">{{ currentPage }} / {{ docPages.length }}</span>
+                <button 
+                  @click="changePage(1)" 
+                  :disabled="currentPage >= docPages.length"
+                  class="px-2 py-1 rounded text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition-colors">
+                  下一页
+                </button>
+              </div>
+
+              <!-- 缩放控制 -->
+              <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                <span class="text-slate-400">视图比例:</span>
+                <select v-model="zoomScale" class="bg-transparent text-slate-200 focus:outline-none cursor-pointer">
+                  <option value="0.9">90%</option>
+                  <option value="1.0">100% (标准)</option>
+                  <option value="1.15">115%</option>
+                  <option value="1.25">125% (放大)</option>
+                </select>
               </div>
             </div>
 
-            <div class="flex items-center space-x-2 text-slate-400">
-              <span class="inline-block w-2.5 h-2.5 rounded bg-amber-400/80"></span>
-              <span>缺陷位置逐字高亮</span>
-              <span class="inline-block w-2.5 h-2.5 rounded bg-sky-400/80 ml-2"></span>
-              <span>对照出处</span>
+            <!-- 图例说明 -->
+            <div class="flex items-center space-x-3 text-xs">
+              <span class="flex items-center space-x-1.5">
+                <span class="w-3 h-3 rounded bg-amber-200 border border-amber-400"></span>
+                <span class="text-slate-300">缺陷逐字高亮</span>
+              </span>
+              <span class="flex items-center space-x-1.5">
+                <span class="w-3 h-3 rounded bg-sky-200 border border-sky-400"></span>
+                <span class="text-slate-300">对照出处</span>
+              </span>
             </div>
           </div>
-
-          <!-- 原版面纸张模拟容器 -->
-          <div class="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-950/40 custom-scrollbar" ref="docViewport">
-            <div class="w-[720px] bg-white text-slate-900 shadow-2xl rounded-sm p-12 min-h-[960px] relative transition-all duration-300 select-text">
+          <!-- 原版面纸张模拟容器 (自适应缩放与居中) -->
+          <div class="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-950/60 custom-scrollbar" ref="docViewport">
+            <div 
+              :style="{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }"
+              class="w-[820px] bg-white text-slate-900 shadow-2xl rounded p-12 min-h-[1050px] relative transition-transform duration-200 select-text font-serif">
               
               <!-- 页面水印 -->
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] text-6xl font-black rotate-[-30deg]">
@@ -361,58 +393,65 @@
       </div>
     </main>
 
-    <!-- 侧边抽屉: 审核专家 Copilot 对话 -->
+    <!-- 悬浮智能伴侣: 审核专家 Copilot (右下角优雅卡片，不压迫主工作区) -->
     <div 
-      :class="showCopilot ? 'translate-x-0' : 'translate-x-full'"
-      class="fixed right-0 top-14 bottom-0 w-[420px] bg-slate-950 border-l border-slate-800 shadow-2xl flex flex-col z-50 transition-transform duration-300">
+      v-if="showCopilot"
+      class="fixed right-6 bottom-6 w-[430px] h-[580px] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-fadeIn">
       
-      <div class="h-12 border-b border-slate-800 px-4 flex items-center justify-between bg-slate-900">
+      <!-- 卡片顶部标题栏 -->
+      <div class="h-12 border-b border-slate-800/80 px-4 flex items-center justify-between bg-slate-950/60 select-none">
         <div class="flex items-center space-x-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></div>
-          <span class="font-bold text-sm text-slate-100">审核专家 · 对话答疑</span>
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+          <span class="font-bold text-xs text-slate-100 tracking-wide">审核专家 AI 助手 (Gemini 3.8 Flash)</span>
         </div>
-        <button @click="showCopilot = false" class="text-slate-400 hover:text-white text-lg">✕</button>
+        <div class="flex items-center space-x-2">
+          <button @click="showCopilot = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- 快捷提问推荐 -->
-      <div class="p-3 bg-slate-900/40 border-b border-slate-800/60 flex flex-wrap gap-1.5">
+      <div class="p-2.5 bg-slate-950/40 border-b border-slate-800/60 flex flex-wrap gap-1.5 shrink-0">
         <button 
           v-for="q in quickQuestions" 
           :key="q"
           @click="askCopilot(q)"
-          class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
+          class="px-2 py-1 rounded-md bg-slate-800 hover:bg-emerald-950 hover:border-emerald-500/40 border border-slate-700/60 text-slate-300 text-[11px] transition-all">
           {{ q }}
         </button>
       </div>
 
       <!-- 对话消息列表 -->
-      <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" ref="chatList">
+      <div class="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar" ref="chatList">
         <div v-for="(msg, idx) in chatMessages" :key="idx" class="space-y-1">
-          <div class="text-[10px] text-slate-500" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
-            {{ msg.role === 'user' ? '审核员' : 'LETU 审核专家' }}
+          <div class="text-[10px] text-slate-400" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+            {{ msg.role === 'user' ? '我' : '审核专家' }}
           </div>
           <div 
-            :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-8' : 'bg-slate-900 border border-slate-800 text-slate-200 mr-8'"
+            :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-8 shadow-sm' : 'bg-slate-950/80 border border-slate-800 text-slate-200 mr-6 shadow'"
             class="p-3 rounded-xl text-xs leading-relaxed whitespace-pre-wrap">
             {{ msg.text }}
           </div>
         </div>
-        <div v-if="copilotLoading" class="text-xs text-slate-400 animate-pulse flex items-center space-x-2">
+        <div v-if="copilotLoading" class="text-xs text-emerald-400 animate-pulse flex items-center space-x-2 p-2">
           <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>专家正在严格检索原文证据链...</span>
+          <span>专家正在严格查核事实依据并思考...</span>
         </div>
       </div>
 
-      <!-- 输入栏 -->
-      <div class="p-3 border-t border-slate-800 bg-slate-900 flex space-x-2">
+      <!-- 底部输入栏 -->
+      <div class="p-3 border-t border-slate-800 bg-slate-950/80 flex space-x-2 shrink-0">
         <input 
           v-model="inputQuestion" 
           @keyup.enter="askCopilot(inputQuestion)"
           placeholder="对当前报告提问 (如: 为什么报第1条?)..." 
-          class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+          class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
         <button 
           @click="askCopilot(inputQuestion)"
-          class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium">
+          class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow transition-all">
           发送
         </button>
       </div>
@@ -422,13 +461,12 @@
     <button 
       v-if="!showCopilot"
       @click="showCopilot = true"
-      class="fixed bottom-6 right-6 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xl flex items-center space-x-2 z-40 transition-transform hover:scale-105">
+      class="fixed bottom-6 right-6 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xl flex items-center space-x-2 z-40 transition-transform hover:scale-105 border border-emerald-400/30">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
       </svg>
-      <span class="text-xs">咨询审核专家</span>
+      <span class="text-xs font-semibold">咨询审核专家</span>
     </button>
-
   </div>
 
   <script src="app.js"></script>
