@@ -166,11 +166,17 @@ createApp({
       this.selectedIssue = issue;
       this.currentPage = issue.page;
 
-      // 平滑滚动到对应页码的高亮区域
+      // 仅在原版面阅读器容器内部滚动，严禁触发外层页面级跑偏
       this.$nextTick(() => {
-        const highlightedEl = document.querySelector('.bg-amber-100');
-        if (highlightedEl) {
-          highlightedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (this.$refs.docViewport) {
+          const highlightedEl = this.$refs.docViewport.querySelector('.bg-amber-100');
+          if (highlightedEl) {
+            const containerTop = this.$refs.docViewport.getBoundingClientRect().top;
+            const elTop = highlightedEl.getBoundingClientRect().top;
+            this.$refs.docViewport.scrollTop += (elTop - containerTop - 150);
+          } else {
+            this.$refs.docViewport.scrollTop = 0;
+          }
         }
       });
     },
