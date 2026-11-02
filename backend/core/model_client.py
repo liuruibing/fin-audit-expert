@@ -59,17 +59,17 @@ class FinancialAuditModelClient:
             user_content += f"\n【当前审阅焦点问题】:\n{issue_context}\n"
         user_content += f"\n【用户问题】: {question}"
 
-        # 1. 如果指定或当前为 gemini，调用 Google 原生 API
+        # 1. 优先调用本地 OMP / Cliproxy 代理网关 (连接真实 Gemini-3-Flash)
+        if current_provider in ["gemini", "vllm"]:
+            gateway_ans = self._call_openai_compatible_api(system_prompt, user_content)
+            if gateway_ans:
+                return gateway_ans
+
+        # 2. 尝试 Google 官方 API (若网关不可用)
         if current_provider == "gemini":
             gemini_ans = self._call_gemini_api(system_prompt, user_content)
             if gemini_ans:
                 return gemini_ans
-
-        # 2. 如果指定或当前为 vllm / openai 兼容端点
-        if current_provider == "vllm":
-            vllm_ans = self._call_openai_compatible_api(system_prompt, user_content)
-            if vllm_ans:
-                return vllm_ans
 
         # 3. 兜底回退：本地 Harness 规则
         offline_reply = self._generate_offline_copilot_reply(question)
