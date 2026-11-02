@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinAudit · 审核专家 - 金融垂类大模型与Harness框架</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+  <div id="app" class="flex flex-col flex-1 h-screen overflow-hidden">
+    
+    <!-- 顶部统一导航栏 -->
+    <header class="h-14 bg-slate-950 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-900/30">
+            审
+          </div>
+          <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
+            LETU · 审核专家
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+            Harness 框架体系
+          </span>
+        </div>
+
+        <nav class="flex space-x-1">
+          <button 
+            @click="currentTab = 'audit'"
+            :class="currentTab === 'audit' ? 'bg-slate-800 text-emerald-400 font-semibold' : 'text-slate-400 hover:text-slate-200'"
+            class="px-3 py-1.5 rounded-md text-sm transition-colors">
+            审核工作台
+          </button>
+          <button 
+            @click="currentTab = 'metrics'"
+            :class="currentTab === 'metrics' ? 'bg-slate-800 text-emerald-400 font-semibold' : 'text-slate-400 hover:text-slate-200'"
+            class="px-3 py-1.5 rounded-md text-sm transition-colors flex items-center space-x-1">
+            <span>价值回执</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </button>
+          <button 
+            @click="showBatchModal = true"
+            class="px-3 py-1.5 rounded-md text-sm text-slate-400 hover:text-slate-200 transition-colors">
+            跑批队列中心
+          </button>
+        </nav>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <div class="text-xs text-slate-400 flex items-center space-x-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>底座: Qwen2.5-32B (私有化部署)</span>
+        </div>
+        <div class="h-4 w-px bg-slate-800"></div>
+        <div class="flex items-center space-x-2 text-sm text-slate-300">
+          <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-semibold text-emerald-400">
+            专
+          </div>
+          <span>admin · 资深合规专家</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体区域: 审核工作台 -->
+    <main v-if="currentTab === 'audit'" class="flex-1 flex flex-col overflow-hidden bg-slate-900">
+      
+      <!-- 文档信息条与过滤器 -->
+      <div class="h-14 bg-slate-900 border-b border-slate-800/80 px-6 flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-3">
+          <span class="text-xs font-semibold uppercase text-slate-400 tracking-wider">当前审阅:</span>
+          <span class="text-sm font-medium text-slate-100 flex items-center space-x-2">
+            <svg class="w-4 h-4 text-rose-400" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+            </svg>
+            <span>{{ auditData.filename }}</span>
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+            公募中报 · v1
+          </span>
+        </div>
+
+        <!-- 分级分列过滤器 -->
+        <div class="flex items-center space-x-2">
+          <button 
+            @click="filterCategory = 'ALL'"
+            :class="filterCategory === 'ALL' ? 'bg-slate-700 text-white' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded text-xs transition-colors">
+            全部 ({{ auditData.summary ? auditData.summary.total_issues : 0 }})
+          </button>
+          <button 
+            @click="filterCategory = 'SUBSTANTIAL'"
+            :class="filterCategory === 'SUBSTANTIAL' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded text-xs transition-colors flex items-center space-x-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            <span>实质性问题 ({{ auditData.summary ? auditData.summary.substantial_issues : 0 }})</span>
+          </button>
+          <button 
+            @click="filterCategory = 'DOUBT'"
+            :class="filterCategory === 'DOUBT' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded text-xs transition-colors flex items-center space-x-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>疑点 ({{ auditData.summary ? auditData.summary.doubt_issues : 0 }})</span>
+          </button>
+          <button 
+            @click="filterCategory = 'FORMAT'"
+            :class="filterCategory === 'FORMAT' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'"
+            class="px-2.5 py-1 rounded text-xs transition-colors flex items-center space-x-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            <span>格式规范 ({{ auditData.summary ? auditData.summary.format_issues : 0 }})</span>
+          </button>
+
+          <div class="h-4 w-px bg-slate-800 mx-2"></div>
+
+          <label class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs cursor-pointer font-medium transition-colors shadow">
+            <span>上传新报告</span>
+            <input type="file" accept=".pdf" class="hidden" @change="handleFileUpload">
+          </label>
+        </div>
+      </div>
+
+      <!-- 双栏核心交互区 -->
+      <div class="flex-1 flex overflow-hidden">
+        
+        <!-- 左栏: 分级问题清单与专家裁决 (450px) -->
+        <div class="w-[480px] border-r border-slate-800 flex flex-col bg-slate-950/70 overflow-hidden shrink-0">
+          <div class="p-3 bg-slate-900/80 border-b border-slate-800/60 text-xs text-slate-400 flex justify-between items-center">
+            <span>发现清单（点击卡片，原版面自动滚动高亮）</span>
+            <span class="text-emerald-400">Harness 证据链对齐率 100%</span>
+          </div>
+
+          <!-- 卡片列表滚动容器 -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div 
+              v-for="issue in filteredIssues" 
+              :key="issue.id"
+              @click="focusIssue(issue)"
+              :class="[
+                'p-4 rounded-xl border transition-all cursor-pointer relative',
+                selectedIssue && selectedIssue.id === issue.id 
+                  ? 'border-emerald-500/60 bg-slate-800/90 ring-1 ring-emerald-500/30 shadow-lg' 
+                  : 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900/80'
+              ]">
+              
+              <!-- 顶部标签与严重度 -->
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                  <span 
+                    :class="getSeverityBadgeClass(issue.severity)"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">
+                    {{ issue.severity === 'HIGH' ? '高风险' : (issue.severity === 'MEDIUM' ? '中' : '建议') }}
+                  </span>
+                  <span class="font-semibold text-sm text-slate-100">{{ issue.title }}</span>
+                </div>
+                <span class="text-[11px] text-slate-400 font-mono">第 {{ issue.page }} 页</span>
+              </div>
+
+              <!-- 描述内容 -->
+              <p class="text-xs text-slate-300 leading-relaxed mb-3">
+                {{ issue.description }}
+              </p>
+
+              <!-- 证据摘录引用框 -->
+              <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs mb-3 font-mono">
+                <div class="text-[10px] text-slate-500 mb-1 flex items-center space-x-1">
+                  <span>原文逐字出处:</span>
+                </div>
+                <div class="text-amber-200/90 text-xs">
+                  “{{ issue.quote }}”
+                </div>
+              </div>
+
+              <!-- 专家裁决操作栏 -->
+              <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs" @click.stop>
+                <div class="flex items-center space-x-2">
+                  <button 
+                    @click="makeDecision(issue, 'CONFIRMED_DEFECT')"
+                    :class="issue.status === 'CONFIRMED_DEFECT' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-800 text-slate-300 hover:bg-emerald-700/60'"
+                    class="px-2.5 py-1 rounded transition-colors text-[11px]">
+                    {{ issue.status === 'CONFIRMED_DEFECT' ? '✓ 已裁决: 真缺陷' : '真缺陷' }}
+                  </button>
+                  <button 
+                    @click="makeDecision(issue, 'FALSE_ALARM')"
+                    :class="issue.status === 'FALSE_ALARM' ? 'bg-rose-700 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:bg-rose-900/50'"
+                    class="px-2 py-1 rounded transition-colors text-[11px]">
+                    {{ issue.status === 'FALSE_ALARM' ? '✕ 误报(回流)' : '误报' }}
+                  </button>
+                </div>
+
+                <button 
+                  @click="openCopilotForIssue(issue)"
+                  class="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 text-[11px]">
+                  <span>问专家</span>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                  </svg>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- 右栏: 报告原版面渲染与逐字高亮覆盖 -->
+        <div class="flex-1 flex flex-col bg-slate-900 overflow-hidden relative">
+          
+          <!-- 视口顶部工具条 -->
+          <div class="h-10 bg-slate-950/60 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-400">
+            <div class="flex items-center space-x-4">
+              <span>版面渲染视图 (PDF 原文逐字高亮)</span>
+              <div class="flex items-center space-x-1">
+                <button 
+                  v-for="p in docPages.length" 
+                  :key="p"
+                  @click="currentPage = p"
+                  :class="currentPage === p ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'"
+                  class="w-6 h-6 rounded flex items-center justify-center font-mono">
+                  {{ p }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2 text-slate-400">
+              <span class="inline-block w-2.5 h-2.5 rounded bg-amber-400/80"></span>
+              <span>缺陷位置逐字高亮</span>
+              <span class="inline-block w-2.5 h-2.5 rounded bg-sky-400/80 ml-2"></span>
+              <span>对照出处</span>
+            </div>
+          </div>
+
+          <!-- 原版面纸张模拟容器 -->
+          <div class="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-950/40 custom-scrollbar" ref="docViewport">
+            <div class="w-[720px] bg-white text-slate-900 shadow-2xl rounded-sm p-12 min-h-[960px] relative transition-all duration-300 select-text">
+              
+              <!-- 页面水印 -->
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] text-6xl font-black rotate-[-30deg]">
+                FINANCIAL AUDIT
+              </div>
+
+              <!-- 顶部页眉 -->
+              <div class="border-b border-slate-200 pb-2 mb-8 flex justify-between text-xs text-slate-500 font-mono">
+                <span>{{ auditData.filename }}</span>
+                <span>第 {{ currentPage }} 页 / 共 {{ docPages.length }} 页</span>
+              </div>
+
+              <!-- 页面文本段落流 -->
+              <div class="space-y-4">
+                <div 
+                  v-for="(span, sIdx) in currentPageSpans" 
+                  :key="sIdx"
+                  :id="'span-' + span.page + '-' + sIdx"
+                  :class="[
+                    'text-sm leading-relaxed relative p-1 rounded transition-all',
+                    isSpanHighlighted(span) ? 'bg-amber-100 ring-2 ring-amber-400/80 text-amber-950 font-medium' : '',
+                    isSpanContext(span) ? 'bg-sky-50 ring-2 ring-sky-400/60 text-sky-950' : ''
+                  ]">
+                  
+                  {{ span.text }}
+
+                  <!-- 高亮提示浮标 -->
+                  <div 
+                    v-if="isSpanHighlighted(span)"
+                    class="absolute -top-3 right-2 bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded shadow font-bold tracking-wider">
+                    {{ selectedIssue ? selectedIssue.title : '缺陷' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 底部页脚 -->
+              <div class="absolute bottom-6 left-12 right-12 border-t border-slate-200 pt-2 flex justify-between text-xs text-slate-400">
+                <span>LETU 金融审核专家 Harness 验证系统</span>
+                <span>Page {{ currentPage }}</span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- 价值回执与全局大屏 -->
+    <main v-if="currentTab === 'metrics'" class="flex-1 p-8 overflow-y-auto bg-slate-900 custom-scrollbar">
+      <div class="max-w-6xl mx-auto space-y-8">
+        
+        <div class="flex justify-between items-end">
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">价值回执工作台</h2>
+            <p class="text-sm text-slate-400 mt-1">全局审核成果、拦截缺陷统计与专家裁决沉淀分析</p>
+          </div>
+          <button @click="currentTab = 'audit'" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-200">
+            返回审核工作台
+          </button>
+        </div>
+
+        <!-- 4 核心指标卡 -->
+        <div class="grid grid-cols-4 gap-5">
+          <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow">
+            <div class="text-xs text-slate-400 font-medium">累计公开定期报告审核</div>
+            <div class="text-3xl font-extrabold text-white mt-2 font-mono">{{ metrics.total_documents_audited }} <span class="text-sm font-normal text-slate-400">份</span></div>
+            <div class="text-xs text-emerald-400 mt-2">覆盖 {{ metrics.covered_institutions }} 家公募/理财机构</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow">
+            <div class="text-xs text-slate-400 font-medium">累计发现问题与疑点</div>
+            <div class="text-3xl font-extrabold text-amber-400 mt-2 font-mono">{{ metrics.total_issues_flagged }} <span class="text-sm font-normal text-slate-400">项</span></div>
+            <div class="text-xs text-slate-400 mt-2">逐条原文逐字坐标定位</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow">
+            <div class="text-xs text-slate-400 font-medium">成功拦截实质性错误</div>
+            <div class="text-3xl font-extrabold text-rose-400 mt-2 font-mono">{{ metrics.substantial_defects_prevented }} <span class="text-sm font-normal text-slate-400">个</span></div>
+            <div class="text-xs text-rose-400/80 mt-2">金额/主体/时点错未外流</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow">
+            <div class="text-xs text-slate-400 font-medium">单篇审阅平均耗时</div>
+            <div class="text-3xl font-extrabold text-emerald-400 mt-2 font-mono">≈ 3 <span class="text-sm font-normal text-slate-400">分钟</span></div>
+            <div class="text-xs text-slate-400 mt-2">原人工通读需 4 小时/篇</div>
+          </div>
+        </div>
+
+        <!-- 飞轮沉淀 -->
+        <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+          <h3 class="text-base font-bold text-white mb-4">专家裁决数据飞轮沉淀</h3>
+          <div class="flex items-center space-x-8">
+            <div>
+              <span class="text-xs text-slate-400">专家一键裁决总数</span>
+              <div class="text-2xl font-bold text-white mt-1">{{ metrics.expert_decisions_recorded }} 次</div>
+            </div>
+            <div class="h-10 w-px bg-slate-700"></div>
+            <div>
+              <span class="text-xs text-slate-400">确认真缺陷</span>
+              <div class="text-2xl font-bold text-emerald-400 mt-1">{{ metrics.confirmed_count }} 次</div>
+            </div>
+            <div class="h-10 w-px bg-slate-700"></div>
+            <div>
+              <span class="text-xs text-slate-400">误报回流金标池</span>
+              <div class="text-2xl font-bold text-rose-400 mt-1">{{ metrics.false_alarm_count }} 次</div>
+            </div>
+            <div class="h-10 w-px bg-slate-700"></div>
+            <div class="text-xs text-slate-300 max-w-md">
+              每一次专家裁决都会回流进入金标微调数据集，驱动模型与规则下一版本迭代，实现“越用越准”。
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- 侧边抽屉: 审核专家 Copilot 对话 -->
+    <div 
+      :class="showCopilot ? 'translate-x-0' : 'translate-x-full'"
+      class="fixed right-0 top-14 bottom-0 w-[420px] bg-slate-950 border-l border-slate-800 shadow-2xl flex flex-col z-50 transition-transform duration-300">
+      
+      <div class="h-12 border-b border-slate-800 px-4 flex items-center justify-between bg-slate-900">
+        <div class="flex items-center space-x-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></div>
+          <span class="font-bold text-sm text-slate-100">审核专家 · 对话答疑</span>
+        </div>
+        <button @click="showCopilot = false" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <!-- 快捷提问推荐 -->
+      <div class="p-3 bg-slate-900/40 border-b border-slate-800/60 flex flex-wrap gap-1.5">
+        <button 
+          v-for="q in quickQuestions" 
+          :key="q"
+          @click="askCopilot(q)"
+          class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
+          {{ q }}
+        </button>
+      </div>
+
+      <!-- 对话消息列表 -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" ref="chatList">
+        <div v-for="(msg, idx) in chatMessages" :key="idx" class="space-y-1">
+          <div class="text-[10px] text-slate-500" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+            {{ msg.role === 'user' ? '审核员' : 'LETU 审核专家' }}
+          </div>
+          <div 
+            :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-8' : 'bg-slate-900 border border-slate-800 text-slate-200 mr-8'"
+            class="p-3 rounded-xl text-xs leading-relaxed whitespace-pre-wrap">
+            {{ msg.text }}
+          </div>
+        </div>
+        <div v-if="copilotLoading" class="text-xs text-slate-400 animate-pulse flex items-center space-x-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>专家正在严格检索原文证据链...</span>
+        </div>
+      </div>
+
+      <!-- 输入栏 -->
+      <div class="p-3 border-t border-slate-800 bg-slate-900 flex space-x-2">
+        <input 
+          v-model="inputQuestion" 
+          @keyup.enter="askCopilot(inputQuestion)"
+          placeholder="对当前报告提问 (如: 为什么报第1条?)..." 
+          class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+        <button 
+          @click="askCopilot(inputQuestion)"
+          class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium">
+          发送
+        </button>
+      </div>
+    </div>
+
+    <!-- 底部悬浮打开 Copilot 按钮 -->
+    <button 
+      v-if="!showCopilot"
+      @click="showCopilot = true"
+      class="fixed bottom-6 right-6 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xl flex items-center space-x-2 z-40 transition-transform hover:scale-105">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+      </svg>
+      <span class="text-xs">咨询审核专家</span>
+    </button>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
