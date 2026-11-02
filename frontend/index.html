@@ -10,11 +10,11 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
-  <div id="app" class="flex flex-col flex-1 h-screen overflow-hidden">
+<body class="bg-slate-900 text-slate-100 h-screen max-h-screen overflow-hidden flex flex-col font-sans select-none m-0 p-0">
+  <div id="app" class="flex flex-col h-full max-h-full overflow-hidden">
     
-    <!-- 顶部统一导航栏 -->
-    <header class="h-14 bg-slate-950 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
+    <!-- 顶部统一导航栏 (固定吸顶) -->
+    <header class="h-14 bg-slate-950 border-b border-slate-800 px-6 flex items-center justify-between shrink-0 z-20">
       <div class="flex items-center space-x-6">
         <div class="flex items-center space-x-3">
           <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-900/30">
@@ -75,11 +75,11 @@
       </div>
     </header>
 
-    <!-- 主体区域: 审核工作台 -->
-    <main v-if="currentTab === 'audit'" class="flex-1 flex flex-col overflow-hidden bg-slate-900">
+    <!-- 主体区域: 审核工作台 (锁死整体，杜绝页面滚动) -->
+    <main v-if="currentTab === 'audit'" class="flex-1 min-h-0 flex flex-col overflow-hidden bg-slate-900">
       
-      <!-- 文档信息条与过滤器 -->
-      <div class="h-14 bg-slate-900 border-b border-slate-800/80 px-6 flex items-center justify-between shrink-0">
+      <!-- 二级工具栏 (固定吸顶) -->
+      <div class="h-12 bg-slate-900 border-b border-slate-800/80 px-6 flex items-center justify-between shrink-0 z-10">
         <div class="flex items-center space-x-3">
           <span class="text-xs font-semibold uppercase text-slate-400 tracking-wider">切换研报样本:</span>
           <select 
@@ -133,18 +133,18 @@
         </div>
       </div>
 
-      <!-- 双栏核心交互区 -->
-      <div class="flex-1 flex overflow-hidden">
+      <!-- 左中右三栏核心工作台 (各模块在内部独立滚动) -->
+      <div class="flex-1 min-h-0 flex overflow-hidden">
         
-        <!-- 左栏: 分级问题清单与专家裁决 (420px) -->
-        <div class="w-[420px] border-r border-slate-800 flex flex-col bg-slate-950/70 overflow-hidden shrink-0">
-          <div class="p-3 bg-slate-900/80 border-b border-slate-800/60 text-xs text-slate-400 flex justify-between items-center">
-            <span>发现清单（点击卡片，原版面自动滚动高亮）</span>
-            <span class="text-emerald-400 font-medium">Harness 证据链 100% 对齐</span>
+        <!-- 左模块: 分级问题清单 (仅自身列表滚动) -->
+        <div class="w-[390px] border-r border-slate-800 flex flex-col min-h-0 bg-slate-950/70 overflow-hidden shrink-0">
+          <div class="h-9 px-3.5 bg-slate-900/90 border-b border-slate-800/60 text-xs text-slate-400 flex justify-between items-center shrink-0">
+            <span>发现清单</span>
+            <span class="text-emerald-400 font-medium">Harness 校验 100% 对齐</span>
           </div>
 
-          <!-- 卡片列表滚动容器 -->
-          <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+          <!-- 卡片列表独立滚动容器 -->
+          <div class="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
             <div 
               v-for="issue in filteredIssues" 
               :key="issue.id"
@@ -225,11 +225,11 @@
           </div>
         </div>
 
-        <!-- 右栏: 报告原版面渲染与逐字高亮覆盖 -->
-        <div class="flex-1 flex flex-col bg-slate-900 overflow-hidden relative">
+        <!-- 中模块: 报告原版面阅读器 (仅自身画布区域独立滚动) -->
+        <div class="flex-1 min-h-0 flex flex-col bg-slate-900 overflow-hidden relative">
           
-          <!-- 视口顶部工具条 (专业 PDF 阅读器风格) -->
-          <div class="h-11 bg-slate-950/80 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-300 shrink-0">
+          <!-- 视口顶部工具条 (固定) -->
+          <div class="h-9 bg-slate-950/80 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-300 shrink-0">
             <div class="flex items-center space-x-3">
               <!-- 翻页控制 -->
               <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
@@ -323,8 +323,81 @@
 
         </div>
 
-      </div>
+        <!-- 右模块: 审核专家 Copilot 对话 (并列第三栏，仅自身消息列表内部滚动) -->
+        <div 
+          v-if="showCopilot"
+          class="w-[390px] border-l border-slate-800 flex flex-col min-h-0 bg-slate-950/90 overflow-hidden shrink-0">
+          
+          <!-- 右栏顶部固定标题条 -->
+          <div class="h-9 px-3.5 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div class="flex items-center space-x-2">
+              <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+              <span class="font-bold text-xs text-slate-100">审核专家 (Gemini 3.8 Flash)</span>
+            </div>
+            <button @click="showCopilot = false" class="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition-colors" title="收起右栏">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
 
+          <!-- 快捷提问推荐 (固定) -->
+          <div class="p-2 bg-slate-950/60 border-b border-slate-800/60 flex flex-wrap gap-1 shrink-0">
+            <button 
+              v-for="q in quickQuestions" 
+              :key="q"
+              @click="askCopilot(q)"
+              class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-950 border border-slate-700/60 text-slate-300 text-[10px] transition-all">
+              {{ q }}
+            </button>
+          </div>
+
+          <!-- 对话消息列表 (仅在此区域内部独立滚动) -->
+          <div class="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5 custom-scrollbar" ref="chatList">
+            <div v-for="(msg, idx) in chatMessages" :key="idx" class="space-y-0.5">
+              <div class="text-[10px] text-slate-400" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+                {{ msg.role === 'user' ? '审核员' : 'LETU 专家' }}
+              </div>
+              <div 
+                :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-6 shadow-sm' : 'bg-slate-900 border border-slate-800 text-slate-200 mr-4 shadow'"
+                class="p-2.5 rounded-xl text-xs leading-relaxed whitespace-pre-wrap">
+                {{ msg.text }}
+              </div>
+            </div>
+            <div v-if="copilotLoading" class="text-xs text-emerald-400 animate-pulse flex items-center space-x-1.5 p-1">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>专家正在实时查核依据...</span>
+            </div>
+          </div>
+
+          <!-- 底部固定输入栏 -->
+          <div class="p-2.5 border-t border-slate-800 bg-slate-950 flex space-x-1.5 shrink-0">
+            <input 
+              v-model="inputQuestion" 
+              @keyup.enter="askCopilot(inputQuestion)"
+              placeholder="对当前报告提问..." 
+              class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+            <button 
+              @click="askCopilot(inputQuestion)"
+              class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow transition-all">
+              发送
+            </button>
+          </div>
+        </div>
+
+        <!-- 右栏收起状态下的侧边开关栏 -->
+        <button 
+          v-if="!showCopilot"
+          @click="showCopilot = true"
+          class="w-8 border-l border-slate-800 bg-slate-950/80 hover:bg-slate-900 flex flex-col items-center justify-center text-slate-400 hover:text-emerald-400 transition-colors shrink-0 cursor-pointer"
+          title="展开审核专家对话">
+          <svg class="w-4 h-4 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          <span class="text-[10px] font-bold [writing-mode:vertical-lr] tracking-widest text-emerald-400">展开AI专家</span>
+        </button>
+
+      </div>
     </main>
 
     <!-- 价值回执与全局大屏 -->
@@ -393,81 +466,6 @@
       </div>
     </main>
 
-    <!-- 悬浮智能伴侣: 审核专家 Copilot (右下角优雅卡片，不压迫主工作区) -->
-    <div 
-      v-if="showCopilot"
-      class="fixed right-6 bottom-6 w-[430px] h-[580px] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-fadeIn">
-      
-      <!-- 卡片顶部标题栏 -->
-      <div class="h-12 border-b border-slate-800/80 px-4 flex items-center justify-between bg-slate-950/60 select-none">
-        <div class="flex items-center space-x-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-          <span class="font-bold text-xs text-slate-100 tracking-wide">审核专家 AI 助手 (Gemini 3.8 Flash)</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <button @click="showCopilot = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- 快捷提问推荐 -->
-      <div class="p-2.5 bg-slate-950/40 border-b border-slate-800/60 flex flex-wrap gap-1.5 shrink-0">
-        <button 
-          v-for="q in quickQuestions" 
-          :key="q"
-          @click="askCopilot(q)"
-          class="px-2 py-1 rounded-md bg-slate-800 hover:bg-emerald-950 hover:border-emerald-500/40 border border-slate-700/60 text-slate-300 text-[11px] transition-all">
-          {{ q }}
-        </button>
-      </div>
-
-      <!-- 对话消息列表 -->
-      <div class="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar" ref="chatList">
-        <div v-for="(msg, idx) in chatMessages" :key="idx" class="space-y-1">
-          <div class="text-[10px] text-slate-400" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
-            {{ msg.role === 'user' ? '我' : '审核专家' }}
-          </div>
-          <div 
-            :class="msg.role === 'user' ? 'bg-emerald-600 text-white ml-8 shadow-sm' : 'bg-slate-950/80 border border-slate-800 text-slate-200 mr-6 shadow'"
-            class="p-3 rounded-xl text-xs leading-relaxed whitespace-pre-wrap">
-            {{ msg.text }}
-          </div>
-        </div>
-        <div v-if="copilotLoading" class="text-xs text-emerald-400 animate-pulse flex items-center space-x-2 p-2">
-          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>专家正在严格查核事实依据并思考...</span>
-        </div>
-      </div>
-
-      <!-- 底部输入栏 -->
-      <div class="p-3 border-t border-slate-800 bg-slate-950/80 flex space-x-2 shrink-0">
-        <input 
-          v-model="inputQuestion" 
-          @keyup.enter="askCopilot(inputQuestion)"
-          placeholder="对当前报告提问 (如: 为什么报第1条?)..." 
-          class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
-        <button 
-          @click="askCopilot(inputQuestion)"
-          class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow transition-all">
-          发送
-        </button>
-      </div>
-    </div>
-
-    <!-- 底部悬浮打开 Copilot 按钮 -->
-    <button 
-      v-if="!showCopilot"
-      @click="showCopilot = true"
-      class="fixed bottom-6 right-6 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xl flex items-center space-x-2 z-40 transition-transform hover:scale-105 border border-emerald-400/30">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-      </svg>
-      <span class="text-xs font-semibold">咨询审核专家</span>
-    </button>
-  </div>
 
   <script src="app.js"></script>
 </body>

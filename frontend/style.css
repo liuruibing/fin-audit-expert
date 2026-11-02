@@ -1,3 +1,19 @@
+/* 全局锁死页面外层，严禁整页滚动，所有滚动局限在各自模块内部 */
+html, body {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+#app {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
 /* 自定义滚动条 */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

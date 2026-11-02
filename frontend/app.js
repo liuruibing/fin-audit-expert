@@ -36,7 +36,7 @@ createApp({
       },
 
       // 审核专家 Copilot
-      showCopilot: false,
+      showCopilot: true,
       copilotLoading: false,
       inputQuestion: '',
       quickQuestions: [
