@@ -65,9 +65,13 @@ class DocumentClassifier:
 
         combined_feature = f"{filename}\n{front_text}"
 
-        if any(kw in combined_feature for kw in ["招募說明書", "招募说明书", "招股说明书", "發售說明書"]):
+        if any(kw in combined_feature for kw in ["基金产品资料概要", "產品資料概要", "产品资料概要"]):
+            doc_type = "FACTSHEET"
+            doc_type_name = "基金产品资料概要 (更新)"
+            is_audited = False
+        elif any(kw in combined_feature for kw in ["招募說明書", "招募说明书", "招股说明书", "發售說明書"]):
             doc_type = "PROSPECTUS"
-            doc_type_name = "招募说明书/发行文件"
+            doc_type_name = "更新的招募说明书" if "更新" in combined_feature else "招募说明书/销售文件"
             is_audited = False
         elif any(kw in combined_feature for kw in ["週報", "周报", "每周策略", "weekly"]):
             doc_type = "WEEKLY"
@@ -116,14 +120,16 @@ class DocumentClassifier:
         # 根据文本特征自适应区分主体属性
         if stock_code or any(kw in combined_feature for kw in ["股份代號", "上市公佈", "董事會報告", "港幣櫃台", "人民幣櫃台"]):
             entity_type = "LISTED_COMPANY"
-            if not entity_name or entity_name == "金融资管机构":
-                entity_name = front_spans[0] if front_spans else "上市公司"
+            if not entity_name or entity_name == "金融资管机构" or "/" in entity_name:
+                entity_name = "上市公司"
         elif any(kw in combined_feature for kw in ["理财有限责任公司", "理财子公司", "理财产品", "财富管理"]):
             entity_type = "BANK_WEALTH"
-        elif any(kw in combined_feature for kw in ["证券投资基金", "基金管理人", "基金托管人", "招募说明书", "LOF", "ETF"]):
+        elif any(kw in combined_feature for kw in ["证券投资基金", "基金管理人", "基金托管人", "招募说明书", "资料概要", "LOF", "ETF"]):
             entity_type = "PUBLIC_FUND"
-            if not entity_name or entity_name == "金融资管机构":
-                entity_name = front_spans[0] if front_spans else "公募证券投资基金"
+            if not entity_name or entity_name == "金融资管机构" or "/" in entity_name:
+                # 寻找包含基金或投资的真实名称
+                valid_names = [s for s in front_spans if len(s.strip()) > 5 and "/" not in s]
+                entity_name = valid_names[0].strip() if valid_names else "公募证券投资基金"
         return DocumentProfile(
             doc_type=doc_type,
             doc_type_name=doc_type_name,

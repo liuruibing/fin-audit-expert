@@ -26,12 +26,21 @@ class TextSpan:
 
 
 class ParsedDocument:
-    def __init__(self, filename: str, total_pages: int, spans: List[TextSpan], sections: List[Dict[str, Any]]):
+    def __init__(
+        self,
+        filename: str,
+        total_pages: int,
+        spans: List[TextSpan],
+        sections: List[Dict[str, Any]],
+        tables: Optional[List[Dict[str, Any]]] = None,
+        images: Optional[List[Dict[str, Any]]] = None,
+    ):
         self.filename = filename
         self.total_pages = total_pages
         self.spans = spans
         self.sections = sections
-
+        self.tables = tables or []
+        self.images = images or []
     def find_text_evidence(self, query: str, page_hint: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """
         在文档中检索引用文本，返回精确命中或最高相似度的坐标。
@@ -102,6 +111,8 @@ class DocumentParser:
         doc = fitz.open(file_path)
         spans: List[TextSpan] = []
         sections: List[Dict[str, Any]] = []
+        parsed_tables: List[Dict[str, Any]] = []
+        parsed_images: List[Dict[str, Any]] = []
 
         current_section = "封面/引言"
         section_regex = re.compile(r"^(第[一二三四五六七八九十0-9]+[节部分]|§?\s*[1-9]\.[0-9]?)\s*(.*)")
@@ -111,8 +122,60 @@ class DocumentParser:
 
         for page_idx in range(pages_to_read):
             page_num = page_idx + 1
-            
-            # 使用 textpage 提取 blocks
+            page = doc[page_idx]
+
+            # -------------------------------------------------------------
+            # 1. 结构化表格识别 (Table Structure Extraction)
+            # -------------------------------------------------------------
+            try:
+                tabs = page.find_tables()
+                for t_idx, tab in enumerate(tabs.tables):
+                    table_matrix = tab.extract()
+                    if table_matrix:
+                        # 格式化为标准 Markdown 表格文本
+                        md_rows = []
+                        for row in table_matrix:
+                            clean_cells = [str(c or "").replace("\n", " ").strip() for c in row]
+                            md_rows.append("| " + " | ".join(clean_cells) + " |")
+                        table_md = "\n".join(md_rows)
+
+                        parsed_tables.append({
+                            "page": page_num,
+                            "bbox": [round(c, 1) for c in tab.bbox],
+                            "rows": len(table_matrix),
+                            "cols": len(table_matrix[0]) if table_matrix else 0,
+                            "markdown": table_md,
+                        })
+
+                        # 将表格作为结构化大元素注册进坐标系统
+                        spans.append(TextSpan(
+                            text=f"[表格] {table_md[:300]}",
+                            page=page_num,
+                            bbox=[round(c, 1) for c in tab.bbox],
+                            section=f"{current_section} (结构化表格)"
+                        ))
+            except Exception:
+                pass
+
+            # -------------------------------------------------------------
+            # 2. 图片与图表对象识别 (Image/Figure Extraction)
+            # -------------------------------------------------------------
+            try:
+                img_list = page.get_images()
+                for img_info in img_list:
+                    xref = img_info[0]
+                    parsed_images.append({
+                        "page": page_num,
+                        "xref": xref,
+                        "width": img_info[2],
+                        "height": img_info[3],
+                    })
+            except Exception:
+                pass
+
+            # -------------------------------------------------------------
+            # 3. 文本块提取与坐标索引 (Text Flow & BBox Mapping)
+            # -------------------------------------------------------------
             blocks = page.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
             for b in blocks:
                 if len(b) >= 5:
@@ -130,7 +193,14 @@ class DocumentParser:
                     spans.append(TextSpan(text=clean_text, page=page_num, bbox=[round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)], section=current_section))
 
         doc.close()
-        return ParsedDocument(filename=os.path.basename(file_path), total_pages=total_in_pdf, spans=spans, sections=sections)
+        return ParsedDocument(
+            filename=os.path.basename(file_path),
+            total_pages=total_in_pdf,
+            spans=spans,
+            sections=sections,
+            tables=parsed_tables,
+            images=parsed_images,
+        )
 
     @staticmethod
     def parse_mock_document(sample_name: str = "swlx") -> ParsedDocument:
@@ -144,6 +214,15 @@ class DocumentParser:
             aia_path = "backend/data/samples/AIA_2022_Annual_Report.pdf"
             if os.path.exists(aia_path):
                 return DocumentParser.parse_pdf(aia_path, max_pages=20)
+        if sample_name == "yfd_factsheet":
+            yfd_path = "backend/data/samples/易方达_智能驾驶ETF_基金产品资料概要.pdf"
+            if os.path.exists(yfd_path):
+                return DocumentParser.parse_pdf(yfd_path)
+        elif sample_name == "yfd_prospectus":
+            yfd_path = "backend/data/samples/易方达_上证50ETF_更新招募说明书.pdf"
+            if os.path.exists(yfd_path):
+                # 读取前 65 页 (覆盖第49页第十一节投资组合与第59页第十二节业绩)
+                return DocumentParser.parse_pdf(yfd_path, max_pages=65)
         if sample_name == "fgth":
             # 富国天惠成长混合 2023年年度报告
             spans = [
