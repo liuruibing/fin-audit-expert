@@ -166,16 +166,16 @@ createApp({
       this.selectedIssue = issue;
       this.currentPage = issue.page;
 
-      // 仅在原版面阅读器容器内部滚动，严禁触发外层页面级跑偏
+      // 在连续阅读器容器中平滑滚动到目标页的高亮元素
       this.$nextTick(() => {
         if (this.$refs.docViewport) {
           const highlightedEl = this.$refs.docViewport.querySelector('.bg-amber-100');
           if (highlightedEl) {
             const containerTop = this.$refs.docViewport.getBoundingClientRect().top;
             const elTop = highlightedEl.getBoundingClientRect().top;
-            this.$refs.docViewport.scrollTop += (elTop - containerTop - 150);
+            this.$refs.docViewport.scrollBy({ top: elTop - containerTop - 120, behavior: 'smooth' });
           } else {
-            this.$refs.docViewport.scrollTop = 0;
+            this.scrollToPage(issue.page);
           }
         }
       });
@@ -296,14 +296,40 @@ createApp({
       }
     },
     changePage(delta) {
-      const target = this.currentPage + delta;
-      if (target >= 1 && target <= this.docPages.length) {
-        this.currentPage = target;
-        this.$nextTick(() => {
-          if (this.$refs.docViewport) {
-            this.$refs.docViewport.scrollTop = 0;
+      this.scrollToPage(this.currentPage + delta);
+    },
+
+    scrollToPage(targetPage) {
+      if (targetPage < 1 || targetPage > this.docPages.length) return;
+      const targetEl = document.getElementById('page-sheet-' + targetPage);
+      if (targetEl && this.$refs.docViewport) {
+        const containerTop = this.$refs.docViewport.getBoundingClientRect().top;
+        const elTop = targetEl.getBoundingClientRect().top;
+        this.$refs.docViewport.scrollBy({ top: elTop - containerTop - 20, behavior: 'smooth' });
+        this.currentPage = targetPage;
+      }
+    },
+
+    handleViewportScroll() {
+      if (!this.$refs.docViewport || !this.docPages || this.docPages.length === 0) return;
+      const container = this.$refs.docViewport;
+      const containerTop = container.getBoundingClientRect().top;
+      const triggerPoint = containerTop + 240; // 视口上部触发基准线
+
+      let activeP = 1;
+      for (const pObj of this.docPages) {
+        const sheet = document.getElementById('page-sheet-' + pObj.page);
+        if (sheet) {
+          const sheetTop = sheet.getBoundingClientRect().top;
+          if (sheetTop <= triggerPoint) {
+            activeP = pObj.page;
+          } else {
+            break;
           }
-        });
+        }
+      }
+      if (this.currentPage !== activeP) {
+        this.currentPage = activeP;
       }
     },
 

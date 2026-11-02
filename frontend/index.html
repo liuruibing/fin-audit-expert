@@ -305,27 +305,36 @@
               </span>
             </div>
           </div>
-          <!-- 原版面纸张模拟容器 (自适应缩放与居中) -->
-          <div class="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-950/60 custom-scrollbar" ref="docViewport">
+          <!-- 原版面纸张画布容器 (连续多页垂直瀑布流，支持滚轮自由连续滚动上下翻页) -->
+          <div 
+            class="flex-1 overflow-y-auto p-8 flex flex-col items-center space-y-10 bg-slate-950/60 custom-scrollbar" 
+            ref="docViewport"
+            @scroll="handleViewportScroll">
+            
             <div 
+              v-for="pageObj in docPages"
+              :key="pageObj.page"
+              :id="'page-sheet-' + pageObj.page"
               :style="{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }"
-              class="w-[820px] bg-white text-slate-900 shadow-2xl rounded p-12 min-h-[1050px] relative transition-transform duration-200 select-text font-serif">
+              class="w-[820px] bg-white text-slate-900 shadow-2xl rounded p-12 min-h-[1050px] relative transition-transform duration-200 select-text font-serif shrink-0">
               
               <!-- 页面水印 -->
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] text-6xl font-black rotate-[-30deg]">
                 FINANCIAL AUDIT
               </div>
 
-              <!-- 顶部页眉 -->
+              <!-- 顶部页眉 (标明各页具体页码) -->
               <div class="border-b border-slate-200 pb-2 mb-8 flex justify-between text-xs text-slate-500 font-mono">
                 <span>{{ auditData.filename }}</span>
-                <span>第 {{ currentPage }} 页 / 共 {{ docPages.length }} 页</span>
+                <span class="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  第 {{ pageObj.page }} 页 / 共 {{ docPages.length }} 页
+                </span>
               </div>
 
               <!-- 页面文本段落流 -->
               <div class="space-y-4">
                 <div 
-                  v-for="(span, sIdx) in currentPageSpans" 
+                  v-for="(span, sIdx) in pageObj.spans" 
                   :key="sIdx"
                   :id="'span-' + span.page + '-' + sIdx"
                   :class="[
@@ -346,9 +355,9 @@
               </div>
 
               <!-- 底部页脚 -->
-              <div class="absolute bottom-6 left-12 right-12 border-t border-slate-200 pt-2 flex justify-between text-xs text-slate-400">
+              <div class="absolute bottom-6 left-12 right-12 border-t border-slate-200 pt-2 flex justify-between text-xs text-slate-400 font-mono">
                 <span>LETU 金融审核专家 Harness 验证系统</span>
-                <span>Page {{ currentPage }}</span>
+                <span>Page {{ pageObj.page }}</span>
               </div>
 
             </div>
