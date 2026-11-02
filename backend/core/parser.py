@@ -91,7 +91,7 @@ class ParsedDocument:
 
 class DocumentParser:
     @staticmethod
-    def parse_pdf(file_path: str) -> ParsedDocument:
+    def parse_pdf(file_path: str, max_pages: Optional[int] = None) -> ParsedDocument:
         """从真实 PDF 中解析文本及其实际几何坐标"""
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"PDF not found: {file_path}")
@@ -106,9 +106,11 @@ class DocumentParser:
         current_section = "封面/引言"
         section_regex = re.compile(r"^(第[一二三四五六七八九十0-9]+[节部分]|§?\s*[1-9]\.[0-9]?)\s*(.*)")
 
-        for page_idx in range(len(doc)):
+        total_in_pdf = len(doc)
+        pages_to_read = min(total_in_pdf, max_pages) if max_pages else total_in_pdf
+
+        for page_idx in range(pages_to_read):
             page_num = page_idx + 1
-            page = doc[page_idx]
             
             # 使用 textpage 提取 blocks
             blocks = page.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
@@ -128,11 +130,20 @@ class DocumentParser:
                     spans.append(TextSpan(text=clean_text, page=page_num, bbox=[round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)], section=current_section))
 
         doc.close()
-        return ParsedDocument(filename=os.path.basename(file_path), total_pages=len(doc), spans=spans, sections=sections)
+        return ParsedDocument(filename=os.path.basename(file_path), total_pages=total_in_pdf, spans=spans, sections=sections)
 
     @staticmethod
     def parse_mock_document(sample_name: str = "swlx") -> ParsedDocument:
         """构造用于开箱演示与测试的真实金融研报样本数据，支持多份报告切换"""
+        if sample_name == "aia_2024":
+            aia_path = "backend/data/samples/AIA_2024_Annual_Report.pdf"
+            if os.path.exists(aia_path):
+                # 真实 371 页友邦保险 2024 年报，为保证前端秒级响应优先加载前 20 页供双栏高亮审阅
+                return DocumentParser.parse_pdf(aia_path, max_pages=20)
+        elif sample_name == "aia_2022":
+            aia_path = "backend/data/samples/AIA_2022_Annual_Report.pdf"
+            if os.path.exists(aia_path):
+                return DocumentParser.parse_pdf(aia_path, max_pages=20)
         if sample_name == "fgth":
             # 富国天惠成长混合 2023年年度报告
             spans = [

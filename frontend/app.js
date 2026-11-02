@@ -16,6 +16,14 @@ createApp({
       selectedSample: 'swlx',
       zoomScale: '1.0',
 
+      // 场景2: 招募说明书核验数据
+      prospectusData: { findings: [], summary: {} },
+      // 场景3: 产品资料概要核验数据
+      factsheetData: { findings: [], summary: {} },
+      selectedCrossItem: null,
+      // 规则知识库 (Markdown)
+      kbFiles: [],
+      selectedKbFile: null,
       // 模型底座引擎
       supportedModels: [
         { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (OMP 内置底座)' },
@@ -319,6 +327,131 @@ createApp({
       } catch (e) {
         issue.diagnosis = '分析失败，请检查网络。';
       }
+    },
+    getScopeBadgeClass(scope) {
+      if (scope === 'ANNUAL') return 'bg-purple-500/10 text-purple-300 border-purple-500/20';
+      if (scope === 'SEMI_ANNUAL') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
+      if (scope === 'FUND') return 'bg-blue-500/10 text-blue-300 border-blue-500/20';
+      if (scope === 'LISTED') return 'bg-rose-500/10 text-rose-300 border-rose-500/20';
+      return 'bg-slate-700/40 text-slate-300 border-slate-700/60';
+    },
+
+    getScopeLabel(scope) {
+      if (scope === 'ANNUAL') return '年报专属';
+      if (scope === 'SEMI_ANNUAL') return '中报专属';
+      if (scope === 'FUND') return '基金专有';
+      if (scope === 'LISTED') return '上市专有';
+      return '全局规范';
+    },
+
+    async fetchKbFiles() {
+      try {
+        const res = await fetch('/api/kb/files');
+        if (res.ok) {
+          const data = await res.json();
+          this.kbFiles = data.files;
+          if (this.kbFiles.length > 0 && !this.selectedKbFile) {
+            this.selectedKbFile = this.kbFiles[0];
+          }
+        }
+      } catch (e) {
+        console.error('获取知识库失败:', e);
+      }
+    },
+
+    selectKbFile(file) {
+      this.selectedKbFile = file;
+    },
+
+    async saveCurrentKbFile() {
+      if (!this.selectedKbFile) return;
+      try {
+        const res = await fetch('/api/kb/files/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: this.selectedKbFile.filename,
+            content: this.selectedKbFile.content
+          })
+        });
+        if (res.ok) {
+          alert(`知识库文件 ${this.selectedKbFile.filename} 已成功保存生效！`);
+        } else {
+          alert('保存失败，请稍后重试。');
+        }
+      } catch (e) {
+        alert('保存网络异常: ' + e);
+      }
+    },
+
+    async synthesizeRule(issue) {
+      const reason = prompt(`【专家标注提炼规则】\n请输入判定依据与提炼指引（AI模型将结合此指引自动生成Markdown通用规则）:`, `该项披露与合同/封面基准矛盾，严禁同类章节复制错漏。`);
+      if (!reason) return;
+
+      try {
+        const res = await fetch('/api/decisions/synthesize-rule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            issue_title: issue.title,
+            issue_quote: issue.quote,
+            expert_reason: reason,
+            severity: issue.severity
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          alert(`✨ 成功提炼新规则：[${data.rule_id}] ${data.title}\n已永久持久化追加至 rules_kb/99_user_learned.md，即刻全量生效！`);
+          // 如果当前在知识库Tab，自动刷新列表
+          this.fetchKbFiles();
+        } else {
+          alert('规则提炼失败，请重试。');
+        }
+      } catch (e) {
+        alert('规则提炼异常: ' + e);
+      }
+    },
+    async fetchProspectusCheck() {
+      try {
+        const res = await fetch('/api/cross-check/prospectus');
+        if (res.ok) {
+          this.prospectusData = await res.json();
+          if (this.prospectusData.findings && this.prospectusData.findings.length > 0) {
+            this.focusCrossItem(this.prospectusData.findings[0]);
+          }
+        }
+      } catch (e) {
+        console.error('获取招书核验数据失败:', e);
+      }
+    },
+
+    async fetchFactsheetCheck() {
+      try {
+        const res = await fetch('/api/cross-check/factsheet');
+        if (res.ok) {
+          this.factsheetData = await res.json();
+          if (this.factsheetData.findings && this.factsheetData.findings.length > 0) {
+            this.focusCrossItem(this.factsheetData.findings[0]);
+          }
+        }
+      } catch (e) {
+        console.error('获取产品资料概要核验失败:', e);
+      }
+    },
+
+    focusCrossItem(item) {
+      this.selectedCrossItem = item;
+      this.$nextTick(() => {
+        const targetEl = document.querySelector('.bg-amber-100, .bg-rose-100, .bg-emerald-50');
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    },
+
+    isCrossHighlighted(checkId) {
+      return this.selectedCrossItem && this.selectedCrossItem.check_id === checkId;
     },
   }
 }).mount('#app');

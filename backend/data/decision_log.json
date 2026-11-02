@@ -53,5 +53,137 @@
     "quote": "2. 招商银行股份有限公司托管协议与报告备查文件。",
     "timestamp": 1793613521,
     "date": "2026-11-02 17:58:41"
+  },
+  {
+    "issue_id": "ISSUE_D36F8F71",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "注：报告截止日 2021 年 6 月 30 日，本基金份额净值 0.8394 元。",
+    "timestamp": 1793614949,
+    "date": "2026-11-02 18:22:29"
+  },
+  {
+    "issue_id": "ISSUE_D36F8F71",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "注：报告截止日 2021 年 6 月 30 日，本基金份额净值 0.8394 元。",
+    "timestamp": 1793614950,
+    "date": "2026-11-02 18:22:30"
+  },
+  {
+    "issue_id": "ISSUE_D36F8F71",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "注：报告截止日 2021 年 6 月 30 日，本基金份额净值 0.8394 元。",
+    "timestamp": 1793614950,
+    "date": "2026-11-02 18:22:30"
+  },
+  {
+    "issue_id": "ISSUE_D36F8F71",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "注：报告截止日 2021 年 6 月 30 日，本基金份额净值 0.8394 元。",
+    "timestamp": 1793614951,
+    "date": "2026-11-02 18:22:31"
+  },
+  {
+    "issue_id": "ISSUE_9397ABE5",
+    "rule_id": "RULE_ENTITY_MISMATCH",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "3. 中国建设银行股份有限公司托管业务备查文件与合规声明。",
+    "timestamp": 1793614952,
+    "date": "2026-11-02 18:22:32"
+  },
+  {
+    "issue_id": "ISSUE_9397ABE5",
+    "rule_id": "RULE_ENTITY_MISMATCH",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "3. 中国建设银行股份有限公司托管业务备查文件与合规声明。",
+    "timestamp": 1793614953,
+    "date": "2026-11-02 18:22:33"
+  },
+  {
+    "issue_id": "ISSUE_9397ABE5",
+    "rule_id": "RULE_ENTITY_MISMATCH",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "3. 中国建设银行股份有限公司托管业务备查文件与合规声明。",
+    "timestamp": 1793614953,
+    "date": "2026-11-02 18:22:33"
+  },
+  {
+    "issue_id": "ISSUE_A5A31B6E",
+    "rule_id": "RULE_SHARE_MATH_VERIFIED",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "境内 A 类份额 2,233,444,879.68 份，C 类份额 53,888,573.87 份，份额总额 2,287,333,453.55 份。",
+    "timestamp": 1793614960,
+    "date": "2026-11-02 18:22:40"
+  },
+  {
+    "issue_id": "ISSUE_A5A31B6E",
+    "rule_id": "RULE_SHARE_MATH_VERIFIED",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "admin · 审核员",
+    "reason": "经人工确认属于实质性表述/时点差错",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "境内 A 类份额 2,233,444,879.68 份，C 类份额 53,888,573.87 份，份额总额 2,287,333,453.55 份。",
+    "timestamp": 1793614961,
+    "date": "2026-11-02 18:22:41"
+  },
+  {
+    "issue_id": "ISSUE_A5A31B6E",
+    "rule_id": "RULE_SHARE_MATH_VERIFIED",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "境内 A 类份额 2,233,444,879.68 份，C 类份额 53,888,573.87 份，份额总额 2,287,333,453.55 份。",
+    "timestamp": 1793614980,
+    "date": "2026-11-02 18:23:00"
+  },
+  {
+    "issue_id": "ISSUE_A4E9A7DA",
+    "rule_id": "RULE_STYLE_INCONSISTENCY",
+    "decision": "FALSE_ALARM",
+    "expert_name": "admin · 审核员",
+    "reason": "经核对为合理业务例外",
+    "document_name": "申万菱信中证申万证券行业指数分级证券投资基金_2022年中期报告.pdf",
+    "quote": "截至 2022-06-30，本基金份额规模如下：",
+    "timestamp": 1793614981,
+    "date": "2026-11-02 18:23:01"
+  },
+  {
+    "issue_id": "TEST_001",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "张专家",
+    "reason": "测试确认",
+    "document_name": "test.pdf",
+    "quote": "测试引用",
+    "timestamp": 1793621425,
+    "date": "2026-11-02 20:10:25"
   }
 ]

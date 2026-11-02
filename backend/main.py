@@ -52,6 +52,16 @@ class DiagnoseRequest(BaseModel):
 class CopilotAskRequest(BaseModel):
     question: str
     issue_id: Optional[str] = None
+class SaveKbFileRequest(BaseModel):
+    filename: str
+    content: str
+
+
+class SynthesizeRuleRequest(BaseModel):
+    issue_title: str
+    issue_quote: str
+    expert_reason: str
+    severity: Optional[str] = "HIGH"
 
 
 from .config import SUPPORTED_MODELS, ACTIVE_MODEL_ID, ACTIVE_PROVIDER
@@ -112,6 +122,69 @@ def switch_sample(req: SampleSwitchRequest):
     active_parsed_doc = DocumentParser.parse_mock_document(req.sample_name)
     active_audit_result = engine.audit_document(active_parsed_doc)
     return get_current_audit()
+# -------------------------------------------------------------
+# Markdown 规则知识库与专家标注自学习 API
+# -------------------------------------------------------------
+from .core.rule_kb_engine import RuleKbEngine
+
+@app.get("/api/kb/rules")
+def get_kb_rules():
+    """获取知识库中加载的所有 Markdown 规则条目"""
+    rules = RuleKbEngine.load_all_rules()
+    return {"rules": [r.to_dict() for r in rules]}
+
+
+@app.get("/api/kb/files")
+def get_kb_files():
+    """获取所有规则 Markdown 源文件列表及内容"""
+    files = RuleKbEngine.get_kb_files()
+    return {"files": files}
+
+
+@app.post("/api/kb/files/save")
+def save_kb_file(req: SaveKbFileRequest):
+    """保存或更新指定的 Markdown 规则文件"""
+    success = RuleKbEngine.save_kb_file(req.filename, req.content)
+    if not success:
+        raise HTTPException(status_code=500, detail="保存规则文件失败")
+    return {"status": "success", "message": f"规则文件 {req.filename} 已成功更新"}
+
+
+@app.post("/api/decisions/synthesize-rule")
+def synthesize_rule_from_decision(req: SynthesizeRuleRequest):
+    """
+    通过专家的样本裁决标注，调用大模型自动提炼生成一条新的 Markdown 规则
+    并持久化追加到 rules_kb/99_user_learned.md，即刻生效！
+    """
+    prompt_for_ai = (
+        f"业务专家在复核金融报告时裁决了一条真实缺陷：\n"
+        f"• 问题标题：{req.issue_title}\n"
+        f"• 样本原文引用：“{req.issue_quote}”\n"
+        f"• 专家判定理由：{req.expert_reason}\n\n"
+        f"请作为资深合规规则架构师，将这一专家裁决抽象为一条通用的 Markdown 格式审核准则（包含：审核关注点、违规识别特征、修正要求）。\n"
+        f"要求：精炼通顺、专业严谨，控制在 100 字内。"
+    )
+    
+    generated_text = ""
+    try:
+        ans = model_client.ask_document_copilot(
+            question=prompt_for_ai,
+            doc_context=f"问题：{req.issue_title}，引文：{req.issue_quote}",
+        )
+        if ans and ans.get("reply"):
+            generated_text = ans["reply"]
+    except Exception:
+        generated_text = f"严格审核该项是否与法定披露基准保持完全一致，杜绝出现“{req.issue_quote[:30]}”类似错漏。"
+
+    res = RuleKbEngine.append_user_learned_rule(
+        rule_title=req.issue_title,
+        issue_quote=req.issue_quote,
+        expert_reason=req.expert_reason,
+        severity=req.severity or "HIGH",
+        generated_rule_text=generated_text,
+    )
+    res["generated_rule_text"] = generated_text
+    return res
 
 
 @app.get("/api/audit/current")
@@ -132,6 +205,21 @@ def get_current_audit():
             for p in range(1, active_parsed_doc.total_pages + 1)
         ],
     }
+# -------------------------------------------------------------
+# 场景 2 & 场景 3: 跨文档交叉核对业务 API
+# -------------------------------------------------------------
+from .core.cross_checker import CrossDocumentAuditor
+
+@app.get("/api/cross-check/prospectus")
+def get_prospectus_cross_check():
+    """场景 2: 用定期报告校验更新的《招募说明书》核对结果"""
+    return CrossDocumentAuditor.audit_prospectus()
+
+
+@app.get("/api/cross-check/factsheet")
+def get_factsheet_cross_check():
+    """场景 3: 用定期报告校验《基金产品资料概要》核对结果"""
+    return CrossDocumentAuditor.audit_factsheet()
 @app.post("/api/audit/diagnose")
 def diagnose_single_issue(req: DiagnoseRequest):
     """卡片就地极速 AI 诊断"""

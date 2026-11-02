@@ -1,8 +1,10 @@
 import pytest
 from backend.core.parser import DocumentParser, TextSpan
-from backend.core.rules import SymbolicAuditRules, RuleFinding
+from backend.core.rules import RuleFinding, GlobalAuditRules, FundSpecificRules, SemiAnnualRules
 from backend.core.harness import HarnessAuditEngine
 from backend.core.flywheel import DecisionFlywheel
+from backend.core.cross_checker import MultiLevelGoujiEngine, CrossDocumentAuditor
+from backend.core.classifier import DocumentClassifier
 
 
 def test_mock_document_parsing():
@@ -19,29 +21,30 @@ def test_mock_document_parsing():
 
 
 def test_rules_detection():
-    """测试规则引擎：时点矛盾、主体矛盾、份额勾稽"""
-    doc = DocumentParser.parse_mock_document()
-    doc_facts = {
-        "report_period": "2022年中期",
-        "report_year": "2022",
-        "cutoff_date": "2022-06-30",
-        "custodian": "中国工商银行股份有限公司",
-    }
+    """测试重构后的规则分流引擎：时点矛盾、主体矛盾、份额勾稽与超期日期"""
+    doc = DocumentParser.parse_mock_document("swlx")
+    profile = DocumentClassifier.classify(doc)
 
-    # 1. 时点冲突
-    time_issues = SymbolicAuditRules.check_time_conflicts(doc_facts, doc.spans)
+    # 1. 中报时点冲突
+    time_issues = SemiAnnualRules.check_semi_annual_cutoff_conflict(profile, doc.spans)
     assert len(time_issues) >= 1
     assert any("2021" in t.quote for t in time_issues)
 
-    # 2. 托管人主体冲突 (封面工行 vs 备查目录建行)
-    entity_issues = SymbolicAuditRules.check_entity_consistency(doc_facts, doc.spans)
+    # 2. 通用跨章节主体冲突 (无硬编码比对)
+    entity_issues = GlobalAuditRules.check_entity_consistency(profile, doc.spans)
     assert len(entity_issues) >= 1
-    assert any("建设银行" in e.quote for e in entity_issues)
 
-    # 3. 份额勾稽核算
-    math_issues = SymbolicAuditRules.check_share_math_gouji(doc.spans)
+    # 3. 基金份额勾稽核算
+    math_issues = FundSpecificRules.check_share_math_gouji(doc.spans)
     assert len(math_issues) >= 1
 
+    # 4. 场景 2 与 场景 3 跨文档核验
+    prosp_res = CrossDocumentAuditor.audit_prospectus()
+    assert prosp_res["summary"]["total_checks"] == 6
+    assert prosp_res["summary"]["defect_checks"] == 3
+
+    fact_res = CrossDocumentAuditor.audit_factsheet()
+    assert fact_res["summary"]["total_checks"] == 3
 
 def test_harness_grounding_assertion():
     """测试 Harness 纪律中枢：有据才报与防幻觉剔除机制"""

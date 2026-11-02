@@ -1,7 +1,18 @@
-from typing import List, Dict, Any, Optional
+import re
 import uuid
+from typing import List, Dict, Any, Optional
 from .parser import ParsedDocument
-from .rules import RuleFinding, SymbolicAuditRules
+from .classifier import DocumentClassifier, DocumentProfile
+from .rules import (
+    RuleFinding,
+    GlobalAuditRules,
+    AnnualReportRules,
+    SemiAnnualRules,
+    QuarterlyReportRules,
+    FundSpecificRules,
+    ListedCompanyRules,
+)
+from .cross_checker import MultiLevelGoujiEngine
 
 
 class AuditIssue:
@@ -21,6 +32,7 @@ class AuditIssue:
         context_bbox: Optional[List[float]] = None,
         confidence: float = 1.0,
         status: str = "PENDING",  # PENDING | CONFIRMED_DEFECT | FALSE_ALARM
+        scope: str = "GLOBAL",
     ):
         self.id = id
         self.rule_id = rule_id
@@ -36,6 +48,7 @@ class AuditIssue:
         self.context_bbox = context_bbox
         self.confidence = confidence
         self.status = status
+        self.scope = scope
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -53,56 +66,83 @@ class AuditIssue:
             "context_bbox": self.context_bbox,
             "confidence": self.confidence,
             "status": self.status,
+            "scope": self.scope,
         }
 
 
 class HarnessAuditEngine:
     """
     Harness 纪律与约束引擎:
-    1. 有据才报: 严格检验证据链，拿不到原文精确物理坐标的一律剔除；
-    2. 分级分列: 拆分实质性缺陷、格式类与疑点；
-    3. 符号与大模型协同: 融合推理结果并排除冲突。
+    第 1 步: 智能判型与画像抽取 (年报 / 半年报 / 季报 / 月报 / 周报 / 招募说明书);
+    第 2 步: 全局通用金融规则 (格式/主体/单位);
+    第 3 步: 按类型与主体分发专属规则处理;
+    第 4 步: 有据才报严格断言 (无坐标直接剔除).
     """
-
-    def __init__(self):
-        self.rules = SymbolicAuditRules()
 
     def audit_document(
         self,
         doc: ParsedDocument,
-        doc_facts: Optional[Dict[str, Any]] = None,
         llm_findings: Optional[List[RuleFinding]] = None,
     ) -> Dict[str, Any]:
-        if doc_facts is None:
-            # 默认从文档抽取基础事实锚点 (封面要素)
-            doc_facts = self._extract_baseline_facts(doc)
+        # -------------------------------------------------------------
+        # 第 1 步: 先区分文档类型与主体画像
+        # -------------------------------------------------------------
+        profile: DocumentProfile = DocumentClassifier.classify(doc)
 
         candidate_findings: List[RuleFinding] = []
 
-        # 1. 运行符号与确定性逻辑规则
-        candidate_findings.extend(self.rules.check_time_conflicts(doc_facts, doc.spans))
-        candidate_findings.extend(self.rules.check_entity_consistency(doc_facts, doc.spans))
-        candidate_findings.extend(self.rules.check_share_math_gouji(doc.spans))
-        candidate_findings.extend(self.rules.check_format_conventions(doc.spans))
-        candidate_findings.extend(self.rules.check_benchmark_consistency(doc.spans))
+        # -------------------------------------------------------------
+        # 第 2 步: 执行全局通用金融规则 (所有金融文档通用)
+        # -------------------------------------------------------------
+        candidate_findings.extend(GlobalAuditRules.check_format_conventions(doc.spans))
+        candidate_findings.extend(GlobalAuditRules.check_entity_consistency(profile, doc.spans))
+        # 执行场景 1: 多层级数字勾稽与文本合规性校验 (表内/表间/文本/超期日期)
+        candidate_findings.extend(MultiLevelGoujiEngine.run_all_checks(doc, profile.cutoff_date))
+        # -------------------------------------------------------------
+        # 第 3 步: 按文档类型进行专属规则分流处理
+        # -------------------------------------------------------------
+        if profile.doc_type == "ANNUAL":
+            # 年报专属: 审计意见/核数师声明、完整年度截止日
+            candidate_findings.extend(AnnualReportRules.check_annual_audit_opinion(doc.spans))
+            candidate_findings.extend(AnnualReportRules.check_annual_cutoff_statement(profile, doc.spans))
+            
+        elif profile.doc_type == "SEMI_ANNUAL":
+            # 半年报/中报专属: 中期时点穿越、上一期模板遗留
+            candidate_findings.extend(SemiAnnualRules.check_semi_annual_cutoff_conflict(profile, doc.spans))
+            
+        elif profile.doc_type == "QUARTERLY":
+            # 季报专属: 季度末时点
+            candidate_findings.extend(QuarterlyReportRules.check_quarterly_period_cutoff(profile, doc.spans))
 
-        # 2. 合并 LLM 上报的线索 (如有)
+        # -------------------------------------------------------------
+        # 第 4 步: 按机构主体性质进行特殊业务分流处理
+        # -------------------------------------------------------------
+        if profile.entity_type == "PUBLIC_FUND":
+            # 基金专有: 份额代数加总勾稽、业绩比较基准冲突
+            candidate_findings.extend(FundSpecificRules.check_share_math_gouji(doc.spans))
+            candidate_findings.extend(FundSpecificRules.check_benchmark_consistency(doc.spans))
+            
+        elif profile.entity_type == "LISTED_COMPANY":
+            # 上市公司专有: 港股双柜台代码核对、核数师合规检查
+            candidate_findings.extend(ListedCompanyRules.check_listed_compliance(profile, doc.spans))
+
+        # 合并大模型上报的外部线索
         if llm_findings:
             candidate_findings.extend(llm_findings)
 
-        # 3. Harness 纪律检验: 证据严格对齐与坐标检索 (Grounding Check)
+        # -------------------------------------------------------------
+        # 第 5 步: Harness 纪律检验: 证据严格对齐与坐标检索 (Grounding Check)
+        # -------------------------------------------------------------
         verified_issues: List[AuditIssue] = []
         discarded_count = 0
 
         for f in candidate_findings:
-            # 主出处坐标比对
             evidence = doc.find_text_evidence(f.quote, page_hint=f.page)
             if not evidence:
-                # 证据无法在原文档中找到，判定为大模型幻觉虚构，直接抛弃！
+                # 原文无确凿证据，直接物理抛弃
                 discarded_count += 1
                 continue
 
-            # 对照处坐标比对 (如有)
             context_bbox = None
             if f.context_quote:
                 ctx_evidence = doc.find_text_evidence(f.context_quote, page_hint=f.context_page)
@@ -123,10 +163,10 @@ class HarnessAuditEngine:
                 context_page=f.context_page,
                 context_bbox=context_bbox,
                 confidence=f.confidence,
+                scope=f.scope,
             )
             verified_issues.append(issue)
 
-        # 4. 统计汇总
         substantial_count = sum(1 for i in verified_issues if i.category == "SUBSTANTIAL")
         doubt_count = sum(1 for i in verified_issues if i.category == "DOUBT")
         format_count = sum(1 for i in verified_issues if i.category == "FORMAT")
@@ -134,7 +174,7 @@ class HarnessAuditEngine:
         return {
             "filename": doc.filename,
             "total_pages": doc.total_pages,
-            "doc_facts": doc_facts,
+            "profile": profile.to_dict(),
             "summary": {
                 "total_issues": len(verified_issues),
                 "substantial_issues": substantial_count,
@@ -143,40 +183,4 @@ class HarnessAuditEngine:
                 "discarded_hallucinations": discarded_count,
             },
             "issues": [i.to_dict() for i in verified_issues],
-        }
-
-    def _extract_baseline_facts(self, doc: ParsedDocument) -> Dict[str, Any]:
-        """从第一页(封面)抽取产品全称、报告期、管理人、托管人作为基准事实锚点"""
-        page1_spans = [s.text for s in doc.spans if s.page == 1]
-        text = "\n".join(page1_spans)
-
-        # 默认提取
-        product_name = page1_spans[0] if page1_spans else doc.filename
-        manager = "基金管理有限公司"
-        custodian = "托管银行股份有限公司"
-        report_period = "年度报告"
-        report_year = "2023"
-        cutoff_date = "2023-12-31"
-
-        for line in page1_spans:
-            if "管理人" in line:
-                manager = line.split("：")[-1].strip()
-            elif "托管人" in line:
-                custodian = line.split("：")[-1].strip()
-            elif "中期" in line or "半年度" in line:
-                report_period = "中期报告"
-                cutoff_date = "2022-06-30"
-                report_year = "2022"
-            elif "年度报告" in line:
-                report_period = "年度报告"
-                cutoff_date = "2023-12-31"
-                report_year = "2023"
-
-        return {
-            "product_name": product_name,
-            "report_period": report_period,
-            "report_year": report_year,
-            "cutoff_date": cutoff_date,
-            "manager": manager,
-            "custodian": custodian,
         }
