@@ -13,6 +13,15 @@ createApp({
       currentPage: 1,
       filterCategory: 'ALL', // 'ALL' | 'SUBSTANTIAL' | 'DOUBT' | 'FORMAT'
       selectedIssue: null,
+      selectedSample: 'swlx',
+
+      // 模型底座引擎
+      supportedModels: [
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (OMP 内置底座)' },
+        { id: 'qwen2.5-32b', name: 'Qwen2.5-32B-Instruct (私有化一体机)' },
+        { id: 'harness-local', name: 'FinAudit Harness 确定性纪律引擎' }
+      ],
+      activeModelId: 'gemini-3.8-flash',
       
       // 价值回执
       metrics: {
@@ -37,7 +46,7 @@ createApp({
       chatMessages: [
         {
           role: 'assistant',
-          text: '您好！我是您的审核专家同事。当前文档已完成多工序初审，左侧列出了所有有据可查的线索。您可以随时针对报告内容向我提问，我将提供严格带出处的判定依据。'
+          text: '您好！我是您的审核专家同事。当前已启用【Gemini 3.8 Flash】大模型作为审查底座，严格依照 Harness 框架纪律为您提供逐条带出处的金融审核服务。'
         }
       ],
 
@@ -60,10 +69,10 @@ createApp({
   },
 
   mounted() {
+    this.fetchModels();
     this.fetchCurrentAudit();
     this.fetchMetrics();
   },
-
   methods: {
     async fetchCurrentAudit() {
       try {
@@ -89,6 +98,58 @@ createApp({
         }
       } catch (e) {
         console.error('获取指标失败:', e);
+      }
+    },
+    async fetchModels() {
+      try {
+        const res = await fetch('/api/models');
+        if (res.ok) {
+          const data = await res.json();
+          this.supportedModels = data.models;
+          this.activeModelId = data.active_model_id;
+        }
+      } catch (e) {
+        console.error('获取模型配置失败:', e);
+      }
+    },
+
+    async handleModelChange() {
+      try {
+        const res = await fetch('/api/models/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_id: this.activeModelId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          this.chatMessages.push({
+            role: 'assistant',
+            text: `[系统消息]: 模型底座已平滑切换为【${data.active_model_id}】。后续审核推理与对话问答将由该引擎驱动。`
+          });
+        }
+      } catch (e) {
+        console.error('切换模型失败:', e);
+      }
+    },
+
+    async handleSampleChange() {
+      try {
+        const res = await fetch('/api/audit/switch-sample', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sample_name: this.selectedSample })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          this.auditData = data.audit;
+          this.docPages = data.doc_pages;
+          this.currentPage = 1;
+          if (this.auditData.issues && this.auditData.issues.length > 0) {
+            this.focusIssue(this.auditData.issues[0]);
+          }
+        }
+      } catch (e) {
+        console.error('切换样本报告失败:', e);
       }
     },
 

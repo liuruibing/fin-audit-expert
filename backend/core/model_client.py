@@ -1,22 +1,51 @@
 import json
 import httpx
 from typing import Dict, Any, List, Optional
-from ..config import LLM_API_BASE, LLM_API_KEY, LLM_MODEL_NAME
+from ..config import (
+    LLM_API_BASE,
+    LLM_API_KEY,
+    LLM_MODEL_NAME,
+    GOOGLE_API_KEY,
+    DEFAULT_GEMINI_MODEL,
+    ACTIVE_PROVIDER,
+)
 
 
 class FinancialAuditModelClient:
-    """金融垂类大模型客户端 (支持私有化 vLLM / Ollama 及离线智能回退)"""
+    """金融垂类大模型客户端 (支持 Google Gemini、私有化 vLLM 与 Harness 本地规则)"""
 
-    def __init__(self, api_base: str = LLM_API_BASE, api_key: str = LLM_API_KEY, model_name: str = LLM_MODEL_NAME):
+    def __init__(
+        self,
+        api_base: str = LLM_API_BASE,
+        api_key: str = LLM_API_KEY,
+        model_name: str = LLM_MODEL_NAME,
+        google_api_key: str = GOOGLE_API_KEY,
+        provider: str = ACTIVE_PROVIDER,
+    ):
         self.api_base = api_base.rstrip("/")
         self.api_key = api_key
         self.model_name = model_name
+        self.google_api_key = google_api_key
+        self.provider = provider
 
-    def ask_document_copilot(self, question: str, doc_context: str, issue_context: Optional[str] = None) -> Dict[str, Any]:
+    def set_provider(self, provider: str, model_name: Optional[str] = None):
+        """动态切换模型提供方"""
+        self.provider = provider
+        if model_name:
+            self.model_name = model_name
+
+    def ask_document_copilot(
+        self,
+        question: str,
+        doc_context: str,
+        issue_context: Optional[str] = None,
+        target_provider: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         对着当前报告自由提问 (审核专家 Copilot 对话)
-        如: "第 3 条为什么判为问题？", "这份报告里托管人全文一致吗？"
         """
+        current_provider = target_provider or self.provider
+
         system_prompt = (
             "你是一位资深的公募基金与资管信披审核专家同事。你的工作纪律是【有据才报、严谨克制】。\n"
             "用户会针对当前正在审阅的这篇报告向你提问。\n"
@@ -30,9 +59,79 @@ class FinancialAuditModelClient:
             user_content += f"\n【当前审阅焦点问题】:\n{issue_context}\n"
         user_content += f"\n【用户问题】: {question}"
 
-        # 尝试调用真实 API，如不可用则使用高质量金融审核离线规则生成回答
+        # 1. 如果指定或当前为 gemini，调用 Google 原生 API
+        if current_provider == "gemini":
+            gemini_ans = self._call_gemini_api(system_prompt, user_content)
+            if gemini_ans:
+                return gemini_ans
+
+        # 2. 如果指定或当前为 vllm / openai 兼容端点
+        if current_provider == "vllm":
+            vllm_ans = self._call_openai_compatible_api(system_prompt, user_content)
+            if vllm_ans:
+                return vllm_ans
+
+        # 3. 兜底回退：本地 Harness 规则
+        offline_reply = self._generate_offline_copilot_reply(question)
+        return {
+            "reply": offline_reply,
+            "model": "FinAudit-Expert-Harness-Local",
+            "mode": "LOCAL_HARNESS",
+        }
+
+    def _call_gemini_api(self, system_prompt: str, user_content: str) -> Optional[Dict[str, Any]]:
+        """调用 Google Gemini 官方生成 API"""
+        if not self.google_api_key:
+            return None
+
+        # 优先使用用户期望的 gemini-3.8-flash，若网关映射则兼容 gemini-2.5-flash
+        models_to_try = [self.model_name, DEFAULT_GEMINI_MODEL, "gemini-2.5-flash"]
+        headers = {"Content-Type": "application/json"}
+        
+        payload = {
+            "system_instruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": user_content}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 1024,
+            }
+        }
+
+        for m in models_to_try:
+            # 清理模型名称前缀
+            clean_m = m.replace("google-antigravity/", "").replace("models/", "")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_m}:generateContent?key={self.google_api_key}"
+            try:
+                with httpx.Client(timeout=12.0) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates and "content" in candidates[0]:
+                            parts = candidates[0]["content"].get("parts", [])
+                            if parts:
+                                reply_text = parts[0].get("text", "")
+                                return {
+                                    "reply": reply_text,
+                                    "model": f"Gemini ({clean_m})",
+                                    "mode": "GEMINI_API",
+                                }
+            except Exception:
+                continue
+
+        return None
+
+    def _call_openai_compatible_api(self, system_prompt: str, user_content: str) -> Optional[Dict[str, Any]]:
+        """调用 vLLM / OpenAI 兼容格式服务"""
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=8.0) as client:
                 resp = client.post(
                     f"{self.api_base}/chat/completions",
                     headers={"Authorization": f"Bearer {self.api_key}"},
@@ -51,10 +150,7 @@ class FinancialAuditModelClient:
                     return {"reply": answer, "model": self.model_name, "mode": "ONLINE_LLM"}
         except Exception:
             pass
-
-        # 离线专家智能回复
-        offline_reply = self._generate_offline_copilot_reply(question)
-        return {"reply": offline_reply, "model": "FinAudit-Expert-Harness-Local", "mode": "LOCAL_HARNESS"}
+        return None
 
     def _generate_offline_copilot_reply(self, question: str) -> str:
         q = question.lower()

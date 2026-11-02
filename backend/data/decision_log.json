@@ -20,5 +20,16 @@
     "quote": "测试引用",
     "timestamp": 1793601342,
     "date": "2026-11-02 14:35:42"
+  },
+  {
+    "issue_id": "TEST_001",
+    "rule_id": "RULE_TIME_CONFLICT",
+    "decision": "CONFIRMED_DEFECT",
+    "expert_name": "张专家",
+    "reason": "测试确认",
+    "document_name": "test.pdf",
+    "quote": "测试引用",
+    "timestamp": 1793606975,
+    "date": "2026-11-02 16:09:35"
   }
 ]

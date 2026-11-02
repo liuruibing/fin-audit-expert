@@ -50,12 +50,64 @@ class CopilotAskRequest(BaseModel):
     issue_id: Optional[str] = None
 
 
+from .config import SUPPORTED_MODELS, ACTIVE_MODEL_ID, ACTIVE_PROVIDER
+
+current_model_id = ACTIVE_MODEL_ID
+current_provider = ACTIVE_PROVIDER
+
+
+class ModelSelectRequest(BaseModel):
+    model_id: str
+
+
+class SampleSwitchRequest(BaseModel):
+    sample_name: str
+
+
 @app.on_event("startup")
 def startup_event():
     global active_audit_result, active_parsed_doc
-    # 启动时预热一份经典基金中报样本文档
-    active_parsed_doc = DocumentParser.parse_mock_document()
+    active_parsed_doc = DocumentParser.parse_mock_document("swlx")
     active_audit_result = engine.audit_document(active_parsed_doc)
+
+
+@app.get("/api/models")
+def get_models():
+    """获取系统支持的所有模型引擎与当前选用状态"""
+    global current_model_id, current_provider
+    return {
+        "active_model_id": current_model_id,
+        "active_provider": current_provider,
+        "models": SUPPORTED_MODELS,
+    }
+
+
+@app.post("/api/models/select")
+def select_model(req: ModelSelectRequest):
+    """切换当前审核大模型底座 (如 Gemini 3.8 Flash, Qwen2.5-32B)"""
+    global current_model_id, current_provider
+    matched = next((m for m in SUPPORTED_MODELS if m["id"] == req.model_id), None)
+    if not matched:
+        raise HTTPException(status_code=400, detail="不支持的模型标识")
+
+    current_model_id = matched["id"]
+    current_provider = matched["provider"]
+    model_client.set_provider(current_provider, current_model_id)
+    return {
+        "status": "success",
+        "active_model_id": current_model_id,
+        "active_provider": current_provider,
+        "message": f"已成功切换为 {matched['name']}",
+    }
+
+
+@app.post("/api/audit/switch-sample")
+def switch_sample(req: SampleSwitchRequest):
+    """切换当前审阅的示例文档"""
+    global active_audit_result, active_parsed_doc
+    active_parsed_doc = DocumentParser.parse_mock_document(req.sample_name)
+    active_audit_result = engine.audit_document(active_parsed_doc)
+    return get_current_audit()
 
 
 @app.get("/api/audit/current")
@@ -63,7 +115,7 @@ def get_current_audit():
     """获取当前正在审阅的文档及其问题清单和版面坐标"""
     global active_audit_result, active_parsed_doc
     if not active_audit_result:
-        active_parsed_doc = DocumentParser.parse_mock_document()
+        active_parsed_doc = DocumentParser.parse_mock_document("swlx")
         active_audit_result = engine.audit_document(active_parsed_doc)
 
     return {
@@ -76,8 +128,6 @@ def get_current_audit():
             for p in range(1, active_parsed_doc.total_pages + 1)
         ],
     }
-
-
 @app.post("/api/audit/upload")
 async def upload_and_audit(file: UploadFile = File(...)):
     """上传真实 PDF 研报并执行 Harness 全自动审核流水线"""
